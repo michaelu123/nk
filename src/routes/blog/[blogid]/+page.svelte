@@ -3,7 +3,7 @@
 	let dataS = $derived(JSON.stringify(data));
 	// let dataS = JSON.stringify(data);
 	let { blogid } = $derived(data);
-	console.log('blogid', blogid);
+	$inspect(blogid);
 </script>
 
 <h1>Blog {dataS}</h1>

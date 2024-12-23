@@ -16,23 +16,30 @@ export const load: PageServerLoad = async (event) => {
 
 export const actions: Actions = {
 	login: async (event) => {
+		console.log('1login');
 		const formData = await event.request.formData();
 		const username = formData.get('username');
 		const password = formData.get('password');
 
 		if (!validateUsername(username)) {
+			console.log('2login');
 			return fail(400, { message: 'Invalid username' });
 		}
 		if (!validatePassword(password)) {
+			console.log('3login');
 			return fail(400, { message: 'Invalid password' });
 		}
+		console.log('4login');
 
 		const results = await db.select().from(table.user).where(eq(table.user.username, username));
+		console.log('5login');
 
 		const existingUser = results.at(0);
 		if (!existingUser) {
+			console.log('6login');
 			return fail(400, { message: 'Incorrect username or password' });
 		}
+		console.log('7login');
 
 		const validPassword = await verify(existingUser.passwordHash, password, {
 			memoryCost: 19456,
@@ -40,14 +47,18 @@ export const actions: Actions = {
 			outputLen: 32,
 			parallelism: 1
 		});
+		console.log('8login');
 		if (!validPassword) {
+			console.log('9login');
 			return fail(400, { message: 'Incorrect username or password' });
 		}
 
+		console.log('alogin');
 		const sessionToken = auth.generateSessionToken();
 		const session = await auth.createSession(sessionToken, existingUser.id);
 		auth.setSessionTokenCookie(event, sessionToken, session.expiresAt);
 
+		console.log('blogin');
 		return redirect(302, '/');
 	},
 	register: async (event) => {
