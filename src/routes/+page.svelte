@@ -1,5 +1,25 @@
 <script lang="ts">
-	import { Map, TileLayer, Marker, Popup, Icon } from 'sveaflet';
+	import {
+		CloseButton,
+		Sidebar,
+		SidebarGroup,
+		SidebarItem,
+		SidebarButton,
+		uiHelpers
+	} from 'svelte-5-ui-lib';
+	import { page } from '$app/stores';
+	let activeUrl = $state($page.url.pathname);
+	const spanClass = 'flex-1 ms-3 whitespace-nowrap';
+	const demoSidebarUi = uiHelpers();
+	let isDemoOpen = $state(true);
+	const closeDemoSidebar = demoSidebarUi.close;
+	$effect(() => {
+		isDemoOpen = demoSidebarUi.isOpen;
+		activeUrl = $page.url.pathname;
+	});
+
+	import { Map, TileLayer, Marker, Popup, Icon, ControlZoom, ControlAttribution } from 'sveaflet';
+	import { Button } from 'svelte-5-ui-lib';
 	import { showNav } from '$lib/state.svelte';
 
 	let map: any = $state(null);
@@ -212,52 +232,107 @@
 	}
 </script>
 
-<div class="sticky top-0 flex justify-end gap-2">
-	<button class="btn bg-red-400" onclick={logmap}>?</button>
-	<button class="btn bg-red-400 text-lg" onclick={() => addMarker(map.getCenter())}>+ </button>
-	<button class="btn bg-red-400 text-3xl" onclick={centerMap}>{'\u2316'}</button>
-	<!-- <button class="btn bg-red-400" onclick={() => (showNav.value = !showNav.value)}>nav</button>
-	<button class="btn bg-red-400 text-lg" onclick={toggleDL}>{'\u263E/\u263C'}</button> -->
-</div>
+{#snippet header()}
+	<div class="sticky top-0 flex h-14 justify-start gap-4 bg-slate-100 p-2">
+		<SidebarButton onclick={demoSidebarUi.toggle} class="mb-2" breakpoint="md" />
+		<div class="w-full"></div>
+		<Button outline pill onclick={logmap}>?</Button>
+		<Button outline pill onclick={() => addMarker(map.getCenter())}>+</Button>
+		<Button outline pill onclick={centerMap}>{'\u2316'}</Button>
+		<!-- <button class="btn bg-red-400" onclick={() => (showNav.value = !showNav.value)}>nav</button>
+		<button class="btn bg-red-400 text-lg" onclick={toggleDL}>{'\u263E/\u263C'}</button> -->
+	</div>
+{/snippet}
 
-<div style="width:100%;height:80vh;">
-	<Map
-		bind:instance={map}
-		options={{
-			center: defaultCenter,
-			zoom: defaultZoom,
-			maxZoom: 18,
-			minZoom: 14
-		}}
-		attribution={'&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'}
+{#snippet svmap()}
+	<div style="width:100%;height:80vh;">
+		<Map
+			bind:instance={map}
+			options={{
+				center: defaultCenter,
+				zoom: defaultZoom,
+				maxZoom: 18,
+				minZoom: 14,
+				zoomControl: false,
+				attributionControl: true
+			}}
+		>
+			<p id="crosshair">{'\u2316'}</p>
+			<TileLayer
+				url={'https://tile.openstreetmap.org/{z}/{x}/{y}.png'}
+				attribution={'&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'}
+			/>
+			<ControlZoom options={{ position: 'topright' }} />
+			<ControlAttribution
+				options={{
+					prefix:
+						'&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+				}}
+			/>
+			{#each markerValues as mv, index (mv['latLng'])}
+				<Marker latLng={mv.latLng} bind:instance={mv.mrk} {index}>
+					{#key mv.selected}
+						<Icon
+							options={mv.selected
+								? selectedMarkerOptions
+								: mv.color == 'red'
+									? redMarkerOptions
+									: greenMarkerOptions}
+						/>
+						<Popup class="flex w-20 flex-col items-center">
+							{mv.name}
+							{#if centering}
+								<Button class="btn m-1 bg-red-400" onclick={centerMarker}>Fertig</Button>
+							{:else if mv.selected}
+								<Button class="btn m-1 bg-red-400" onclick={centerMarker}>Zentrieren</Button>
+								<Button class="btn m-1 bg-red-400" onclick={toggleMarker}>Ändern</Button>
+								<Button class="btn m-1 bg-red-400" onclick={deleteMarker}>Löschen</Button>
+								<Button class="btn m-1 bg-red-400" onclick={toggleMarker}>Kontrolle</Button>
+							{/if}
+						</Popup>
+					{/key}
+				</Marker>
+			{/each}
+		</Map>
+	</div>
+{/snippet}
+
+{#snippet sidebar()}
+	<Sidebar
+		backdrop={false}
+		isOpen={isDemoOpen}
+		closeSidebar={closeDemoSidebar}
+		params={{ x: -50, duration: 500 }}
+		class="z-[500]  h-full w-auto"
+		position="absolute"
+		activeClass="p-2"
+		nonActiveClass="p-2"
+		breakpoint="md"
 	>
-		<p id="crosshair">{'\u2316'}</p>
-		<TileLayer url={'https://tile.openstreetmap.org/{z}/{x}/{y}.png'} />
-		{#each markerValues as mv, index (mv['latLng'])}
-			<Marker latLng={mv.latLng} bind:instance={mv.mrk} {index}>
-				{#key mv.selected}
-					<Icon
-						options={mv.selected
-							? selectedMarkerOptions
-							: mv.color == 'red'
-								? redMarkerOptions
-								: greenMarkerOptions}
-					/>
-					<Popup class="flex w-20 flex-col items-center">
-						{mv.name}
-						{#if centering}
-							<button class="btn m-1 bg-red-400" onclick={centerMarker}>Fertig</button>
-						{:else if mv.selected}
-							<button class="btn m-1 bg-red-400" onclick={centerMarker}>Zentrieren</button>
-							<button class="btn m-1 bg-red-400" onclick={toggleMarker}>Ändern</button>
-							<button class="btn m-1 bg-red-400" onclick={deleteMarker}>Löschen</button>
-							<button class="btn m-1 bg-red-400" onclick={toggleMarker}>Kontrolle</button>
-						{/if}
-					</Popup>
-				{/key}
-			</Marker>
-		{/each}
-	</Map>
+		<!-- <CloseButton
+			onclick={closeDemoSidebar}
+			color="gray"
+			class="absolute right-2 top-2 p-2 md:hidden"
+		/> -->
+		<SidebarGroup border={false}>
+			<SidebarItem label="Dashboard" href="/"></SidebarItem>
+			<SidebarItem label="Kanban" {spanClass} href="/"></SidebarItem>
+			<SidebarItem label="Inbox" {spanClass} href="/"></SidebarItem>
+			<SidebarItem label="Sidebar" href="/components/sidebar"></SidebarItem>
+		</SidebarGroup>
+		<SidebarGroup border={true}>
+			<SidebarItem label="Dashboard" href="/"></SidebarItem>
+			<SidebarItem label="Kanban" {spanClass} href="/"></SidebarItem>
+			<SidebarItem label="Inbox" {spanClass} href="/"></SidebarItem>
+			<SidebarItem label="Sidebar" href="/components/sidebar"></SidebarItem>
+		</SidebarGroup>
+	</Sidebar>
+{/snippet}
+
+{@render header()}
+<div class="relative">
+	{@render sidebar()}
+	{@render svmap()}
 </div>
 
 <style>
