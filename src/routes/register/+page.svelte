@@ -6,10 +6,11 @@
 
 	let { form }: { form: ActionData } = $props();
 	let show = $state(false);
+	let showC = $state(false);
 </script>
 
 <div class="mx-4">
-	<h1 class="my-5 text-xl font-semibold">Login</h1>
+	<h1 class="my-5 text-xl font-semibold">Registrieren</h1>
 	<form method="post" use:enhance>
 		<Label for="username" class="mb-4">
 			Name
@@ -44,10 +45,31 @@
 				{/snippet}
 			</Input>
 		</Label>
-		<div class="flex flex-col gap-4">
-			<a href="/register">Noch nicht registriert? <span class="underline">Zum Registrieren</span></a
+		<Label for="confirmpassword" class="mb-4">
+			Passwort
+			<Input
+				id="confirmpassword"
+				name="confirmpassword"
+				autocomplete="new-password"
+				type={showC ? 'text' : 'password'}
+				placeholder="Passwort bestätigen"
+				size="lg"
+				class="pl-10"
 			>
-			<Button type="submit" class="w-40">Login</Button>
+				{#snippet left()}
+					<button onclick={() => (showC = !showC)} class="pointer-events-auto">
+						{#if showC}
+							<EyeOutline class="h-6 w-6" />
+						{:else}
+							<EyeSlashOutline class="h-6 w-6" />
+						{/if}
+					</button>
+				{/snippet}
+			</Input>
+		</Label>
+		<div class="flex flex-col gap-4">
+			<a href="/login">Schon registriert? <span class="underline">Zum Login</span></a>
+			<Button type="submit" class="w-40">Registrieren</Button>
 		</div>
 	</form>
 	<p class="my-4 text-red-400">{form?.message ?? ''}</p>

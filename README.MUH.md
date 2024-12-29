@@ -8,3 +8,5 @@ C:\Users\Michael\SvelteProjects\nk\node_modules\@sveltejs\kit\src\runtime\server
 vite.config.ts: server: { host: '0.0.0.0', port: 5173 }
 
 npm install leaflet --legacy-peer-deps
+
+C:\tools> ngrok http --url=shiner-meet-termite.ngrok-free.app 5173

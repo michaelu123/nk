@@ -8,19 +8,32 @@
 		uiHelpers
 	} from 'svelte-5-ui-lib';
 	import { page } from '$app/stores';
+	import { getState } from '$lib/state.svelte';
+
+	let nkState = getState();
+	let { markerValues, maxBounds } = nkState;
+	$inspect('markerValues', markerValues);
 	let activeUrl = $state($page.url.pathname);
 	const spanClass = 'flex-1 ms-3 whitespace-nowrap';
-	const demoSidebarUi = uiHelpers();
-	let isDemoOpen = $state(true);
-	const closeDemoSidebar = demoSidebarUi.close;
+	const sidebarUi = uiHelpers();
+	let isSidebarOpen = $state(true);
+	const closeSidebar = sidebarUi.close;
 	$effect(() => {
-		isDemoOpen = demoSidebarUi.isOpen;
+		isSidebarOpen = sidebarUi.isOpen;
 		activeUrl = $page.url.pathname;
 	});
 
-	import { Map, TileLayer, Marker, Popup, Icon, ControlZoom, ControlAttribution } from 'sveaflet';
+	import {
+		Map as SVMap,
+		TileLayer,
+		Marker,
+		Popup,
+		Icon,
+		ControlZoom,
+		ControlAttribution,
+		Polygon
+	} from 'sveaflet';
 	import { Button } from 'svelte-5-ui-lib';
-	import { showNav } from '$lib/state.svelte';
 
 	let map: any = $state(null);
 	let centering = $state(false);
@@ -29,49 +42,12 @@
 	let mucLat = 48.137236594542834,
 		mucLng = 11.576174072626772;
 	let defaultCenter = $state([mucLat, mucLng]);
+	let currPos = $state([mucLat, mucLng]);
+	let posTime = $state(Date.now()); // TODO weg
+	let nowTime = $state(Date.now());
 	let defaultZoom = 15;
-	$inspect(defaultCenter);
-	let props = $props();
-	$inspect(props);
 
-	interface MarkerEntry {
-		latLng: number[];
-		mrk: any | null;
-		selected: boolean;
-		color: 'green' | 'red';
-		name: string;
-	}
-
-	let markerValues = $state<MarkerEntry[]>([
-		{
-			latLng: [mucLat + 0.001, mucLng + 0.001],
-			mrk: null,
-			selected: false,
-			name: 'one',
-			color: 'green'
-		},
-		{
-			latLng: [mucLat - 0.001, mucLng + 0.001],
-			mrk: null,
-			selected: false,
-			name: 'two',
-			color: 'red'
-		},
-		{
-			latLng: [mucLat + 0.001, mucLng - 0.001],
-			mrk: null,
-			selected: false,
-			name: 'three',
-			color: 'green'
-		},
-		{
-			latLng: [mucLat - 0.001, mucLng - 0.001],
-			mrk: null,
-			selected: false,
-			name: 'four',
-			color: 'red'
-		}
-	]);
+	window.setInterval(() => (nowTime = Date.now()), 1000); // TODO weg
 
 	const commonIconOptions = {
 		iconSize: [40, 40], // size of the icon
@@ -92,75 +68,110 @@
 	};
 
 	import selectedMarker from '$lib/assets/yellowMarker.svg';
+	import { goto } from '$app/navigation';
+	import { onMount, untrack } from 'svelte';
 	const selectedMarkerOptions = {
 		...commonIconOptions,
 		iconUrl: selectedMarker
 	};
 
-	// $effect(() => {
-	// 	if (map) {
-	// 		// map.on('click', onMapClick);
-	// 		// map.on('move', onMapMove);
-	// 		// map.setMaxZoom(16);
-	// 		// map.setMinZoom(14);
-	// 	}
-	// });
-
 	$effect(() => {
-		if (markerValues) {
-			markers();
+		if (map) {
+			map.on('click', onMapClick);
+			// map.on('move', onMapMove);
+			// map.setMaxZoom(16);
+			// map.setMinZoom(14);
+			posStart();
 		}
 	});
 
-	function posSucc(pos: any) {
-		console.log('pos2', pos);
-		const crd = pos.coords;
-		console.log('crd', crd);
-		defaultCenter = [crd.latitude, crd.longitude];
-	}
+	$effect(() => {
+		console.log('effect markers');
+		markers();
+	});
 
-	function posErr(err: any) {
-		console.log('Error', err);
+	const fctMap = new Map<string, any>();
+
+	function markers() {
+		for (const [index, mv] of markerValues.entries()) {
+			console.log('setfct1', mv.dbFields.name, mv.mrk);
+			if (mv.mrk) {
+				const newfct = (e: any) => mclick(index, e);
+				const oldfct = fctMap.get(mv.dbFields.id);
+				console.log('setfct2', oldfct, newfct);
+				if (oldfct) {
+					mv.mrk.off('click', oldfct);
+				}
+				mv.mrk.on('click', newfct);
+				fctMap.set(mv.dbFields.id, newfct);
+			}
+		}
 	}
 
 	function toggleDL() {
 		document.documentElement.classList.toggle('dark');
 	}
 
-	function addMarker(ll: any) {
-		markerValues.push({
-			latLng: [ll.lat, ll.lng],
-			mrk: null,
-			selected: false,
-			color: markerValues.length % 2 === 0 ? 'green' : 'red',
-			name: 'unbekannt'
-		});
-	}
+	function mclick(index: number, e: any) {
+		console.log(
+			'mc1',
+			'index',
+			selectedMarkerIndex,
+			'centering',
+			centering,
+			'selected',
+			markerValues[index].selected,
+			'event',
+			e
+		);
 
-	function mclick(index: number) {
-		selectedMarkerIndex = index;
-		for (const [ix, mv] of markerValues.entries()) {
-			mv.selected = index === ix;
+		if (centering) {
+			map.off('move', onMapMove);
+			centering = false;
+			const mv = markerValues[selectedMarkerIndex];
+			nkState.persist(selectedMarkerIndex, { latLng: mv.latLng });
 		}
+		if (selectedMarkerIndex == -1) {
+			const mv = markerValues[index];
+			mv.selected = true;
+			selectedMarkerIndex = index;
+			// for (const [ix, mv] of markerValues.entries()) {
+			// 	mv.selected = index === ix;
+			// }
+		} else if (index == selectedMarkerIndex) {
+			const mv = markerValues[index];
+			mv.selected = false;
+			selectedMarkerIndex = -1;
+		} else {
+			let mv = markerValues[selectedMarkerIndex];
+			mv.selected = false;
+			mv = markerValues[index];
+			mv.selected = true;
+			selectedMarkerIndex = index;
+		}
+		console.log(
+			'mc2',
+			'index',
+			selectedMarkerIndex,
+			'centering',
+			centering,
+			'selected',
+			markerValues[index].selected
+		);
 		// center = map.getCenter(); // to reposition
 	}
 
-	function markers() {
-		for (const [index, mv] of markerValues.entries()) {
-			if (mv.mrk) {
-				mv.mrk.on('click', (e: any) => mclick(index));
-			}
-		}
-	}
-
 	function onMapClick(e: any) {
-		addMarker(e.latlng);
+		if (selectedMarkerIndex != -1) {
+			const mv = markerValues[selectedMarkerIndex];
+			mv.selected = false;
+		}
 	}
 
 	function onMapMove(e: any) {
 		const center = map.getCenter();
 		markerValues[selectedMarkerIndex].latLng = center;
-		console.log('mm');
+		console.log('omm');
 	}
 
 	function logmap() {
@@ -168,77 +179,100 @@
 		console.log('center', map.getCenter());
 	}
 
-	function centerMarker() {
+	function moveMarker() {
+		console.log('mm1', selectedMarkerIndex, centering);
 		if (selectedMarkerIndex == -1) return;
 		console.log('centering', centering);
-		if (centering) {
-			map.off('move', onMapMove);
-			centering = false;
-			const mv = markerValues[selectedMarkerIndex];
-			selectedMarkerIndex = -1;
-			mv.selected = false;
-		} else {
-			map.on('move', onMapMove);
-			centering = true;
-			onMapMove(null);
-		}
-	}
-
-	function deleteMarker() {
-		if (selectedMarkerIndex == -1) return;
-		markerValues.splice(selectedMarkerIndex, 1);
+		map.on('move', onMapMove);
+		centering = true;
+		onMapMove(null);
+		console.log('mm2', selectedMarkerIndex, centering);
 	}
 
 	function toggleMarker() {
+		console.log('to1', selectedMarkerIndex, centering);
 		if (selectedMarkerIndex == -1) return;
 		const mv = markerValues[selectedMarkerIndex];
 		selectedMarkerIndex = -1;
 		mv.selected = false;
 		mv.color = mv.color == 'red' ? 'green' : 'red';
+		console.log('to2', selectedMarkerIndex, centering);
+	}
+
+	function editMarker() {
+		if (selectedMarkerIndex == -1) return;
+		const index = selectedMarkerIndex;
+		const mv = markerValues[selectedMarkerIndex];
+		selectedMarkerIndex = -1;
+		mv.selected = false;
+		goto('/editnk/' + index);
+	}
+
+	function deleteMarker() {
+		console.log('deleteMarker', selectedMarkerIndex);
+		if (selectedMarkerIndex == -1) return;
+		nkState.deleteMarker(selectedMarkerIndex);
+		selectedMarkerIndex = -1;
 	}
 
 	function centerMap() {
-		map.flyTo(defaultCenter, defaultZoom);
+		map.flyTo(currPos, map.getZoom());
 	}
 
-	let geoloc = $state(false);
-	// svelte-ignore non_reactive_update
 	let locid = -1;
 	let tid: NodeJS.Timeout | null = null;
-	if ('geolocation' in navigator) {
-		if (tid) clearTimeout(tid);
-		tid = setTimeout(() => {
+	let geoloc = $state(false);
+
+	function posSucc(pos: any) {
+		console.log('posSucc', pos);
+		const crd = pos.coords;
+		currPos = [crd.latitude, crd.longitude];
+		posTime = pos.timestamp;
+	}
+
+	function posErr(err: any) {
+		console.log('Error', err);
+		posRestart();
+	}
+
+	function posRestart() {
+		if (locid != -1) {
+			navigator.geolocation.clearWatch(locid);
+		}
+		let options = {
+			enableHighAccuracy: true,
+			timeout: Infinity,
+			maximumAge: 5000
+		};
+		locid = navigator.geolocation.watchPosition(posSucc, posErr, options);
+		console.log('locid', locid);
+	}
+
+	function posStart() {
+		if ('geolocation' in navigator) {
 			geoloc = true;
 			console.log('geolocation is available');
-			navigator.geolocation.getCurrentPosition((position) => {
-				console.log('pos1', position);
-				defaultCenter = [position.coords.latitude, position.coords.longitude];
-				centerMap();
-			});
-			let options = {
-				enableHighAccuracy: false,
-				timeout: 5000,
-				maximumAge: 0
-			};
-			if (locid != -1) {
-				navigator.geolocation.clearWatch(locid);
-			}
-			locid = navigator.geolocation.watchPosition(posSucc, posErr, options);
-			console.log('locid', locid, tid);
-		}, 1000);
-	} else {
-		geoloc = false;
-		console.log('geolocation is available');
+			posRestart();
+		} else {
+			geoloc = false;
+			console.log('geolocation is available');
+		}
+	}
+
+	function posNow() {
+		console.log('posNow');
+		navigator.geolocation.getCurrentPosition(posSucc, posErr);
 	}
 </script>
 
 {#snippet header()}
 	<div class="sticky top-0 flex h-14 justify-start gap-4 bg-slate-100 p-2">
-		<SidebarButton onclick={demoSidebarUi.toggle} class="mb-2" breakpoint="md" />
+		<SidebarButton onclick={sidebarUi.toggle} class="mb-2" breakpoint="md" />
 		<div class="w-full"></div>
 		<Button outline pill onclick={logmap}>?</Button>
-		<Button outline pill onclick={() => addMarker(map.getCenter())}>+</Button>
+		<Button outline pill onclick={() => nkState.addMarker(map.getCenter())}>+</Button>
 		<Button outline pill onclick={centerMap}>{'\u2316'}</Button>
+		<Button outline pill onclick={posNow}>{'>'}</Button>
 		<!-- <button class="btn bg-red-400" onclick={() => (showNav.value = !showNav.value)}>nav</button>
 		<button class="btn bg-red-400 text-lg" onclick={toggleDL}>{'\u263E/\u263C'}</button> -->
 	</div>
@@ -246,18 +280,28 @@
 
 {#snippet svmap()}
 	<div style="width:100%;height:80vh;">
-		<Map
+		<SVMap
 			bind:instance={map}
 			options={{
 				center: defaultCenter,
 				zoom: defaultZoom,
 				maxZoom: 18,
-				minZoom: 14,
+				minZoom: 10,
 				zoomControl: false,
-				attributionControl: true
+				attributionControl: true,
+				maxBounds
 			}}
 		>
 			<p id="crosshair">{'\u2316'}</p>
+			<Polygon
+				latLngs={[
+					[maxBounds[0][0], maxBounds[0][1]],
+					[maxBounds[0][0], maxBounds[1][1]],
+					[maxBounds[1][0], maxBounds[1][1]],
+					[maxBounds[1][0], maxBounds[0][1]]
+				]}
+				options={{ fill: false }}
+			/>
 			<TileLayer
 				url={'https://tile.openstreetmap.org/{z}/{x}/{y}.png'}
 				attribution={'&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'}
@@ -269,6 +313,13 @@
 						'&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
 				}}
 			/>
+			{#key currPos}
+				<Marker latLng={currPos}>
+					<Popup class="w-20 text-center">
+						Age: {Math.round((nowTime - posTime) / 1000)} // TODO weg
+					</Popup>
+				</Marker>
+			{/key}
 			{#each markerValues as mv, index (mv['latLng'])}
 				<Marker latLng={mv.latLng} bind:instance={mv.mrk} {index}>
 					{#key mv.selected}
@@ -280,12 +331,10 @@
 									: greenMarkerOptions}
 						/>
 						<Popup class="flex w-20 flex-col items-center">
-							{mv.name}
-							{#if centering}
-								<Button class="btn m-1 bg-red-400" onclick={centerMarker}>Fertig</Button>
-							{:else if mv.selected}
-								<Button class="btn m-1 bg-red-400" onclick={centerMarker}>Zentrieren</Button>
-								<Button class="btn m-1 bg-red-400" onclick={toggleMarker}>Ändern</Button>
+							{mv.dbFields.name}
+							{#if mv.selected}
+								<Button class="btn m-1 bg-red-400" onclick={moveMarker}>Verschieben</Button>
+								<Button class="btn m-1 bg-red-400" onclick={editMarker}>Details</Button>
 								<Button class="btn m-1 bg-red-400" onclick={deleteMarker}>Löschen</Button>
 								<Button class="btn m-1 bg-red-400" onclick={toggleMarker}>Kontrolle</Button>
 							{/if}
@@ -293,15 +342,15 @@
 					{/key}
 				</Marker>
 			{/each}
-		</Map>
+		</SVMap>
 	</div>
 {/snippet}
 
 {#snippet sidebar()}
 	<Sidebar
 		backdrop={false}
-		isOpen={isDemoOpen}
-		closeSidebar={closeDemoSidebar}
+		isOpen={isSidebarOpen}
+		{closeSidebar}
 		params={{ x: -50, duration: 500 }}
 		class="z-[500]  h-full w-auto"
 		position="absolute"
@@ -310,7 +359,7 @@
 		breakpoint="md"
 	>
 		<!-- <CloseButton
-			onclick={closeDemoSidebar}
+			onclick={closeSidebar}
 			color="gray"
 			class="absolute right-2 top-2 p-2 md:hidden"
 		/> -->

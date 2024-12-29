@@ -1,6 +1,8 @@
 <script lang="ts">
 	import '../app.css';
-	let { children } = $props();
+	import { setState } from '$lib/state.svelte';
+	let { children, data } = $props();
+	setState({ user: data.user });
 </script>
 
 <main>
