@@ -9,7 +9,7 @@
 			"name": "Vite",
 			"request": "launch",
 			"runtimeExecutable": "npx",
-			"runtimeArgs": ["vite", "dev", "--open"],
+			"runtimeArgs": ["vite", "dev", "--open", "https://shiner-meet-termite.ngrok-free.app"],
 			"type": "node",
 			"serverReadyAction": {
 				"action": "debugWithChrome",

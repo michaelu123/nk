@@ -39,7 +39,7 @@
 </script>
 
 {#if mv}
-	<h1>EDITNK</h1>
+	<h1>Nistkasten</h1>
 	{#if isEditMode}
 		<input type="text" name="name" class="input" bind:value={name} />
 		<input type="text" name="kind" class="input" bind:value={kind} />
@@ -52,13 +52,13 @@
 	<h2>Zuletzt {mv.dbFields.lastCleaned}</h2>
 
 	<button onclick={toggleEditModeAndSaveToDatabase}>{isEditMode ? 'Save' : 'Edit'}</button>
-	<a href="/editnk/0">ZERO</a>
-	<a href="/editnk/1">ONE</a>
-	<a href="/editnk/2">TWO</a>
-	<a href="/editnk/3">THREE</a>
-	<button onclick={() => goto('/editnk/0')}>BZERO</button>
-	<button onclick={() => goto('/editnk/1')}>BONE</button>
-	<button onclick={() => goto('/editnk/2')}>BTWO</button>
-	<button onclick={() => goto('/editnk/3')}>BTHREE</button>
+	<a href="/nk/0">ZERO</a>
+	<a href="/nk/1">ONE</a>
+	<a href="/nk/2">TWO</a>
+	<a href="/nk/3">THREE</a>
+	<button onclick={() => goto('/nk/0')}>BZERO</button>
+	<button onclick={() => goto('/nk/1')}>BONE</button>
+	<button onclick={() => goto('/nk/2')}>BTWO</button>
+	<button onclick={() => goto('/nk/3')}>BTHREE</button>
 	<button onclick={goBack}>Back</button>
 {/if}

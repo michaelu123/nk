@@ -67,8 +67,20 @@ export class State implements StateProps {
 		this.fetchUserData();
 	}
 
+	getLocalStorageKeys(): string[] {
+		let res: string[] = [];
+		const len = localStorage.length;
+		for (let i = 0; i < len; i++) {
+			const k = localStorage.key(i);
+			if (k) res.push(k);
+		}
+		return res;
+	}
+
 	async fetchUserData() {
-		let keys = await this.idb!.getAllKeys('nk');
+		let keys = this.idb
+			? (await this.idb!.getAllKeys('nk')).map((k) => k.toString())
+			: this.getLocalStorageKeys();
 		let oneSeen = false;
 		for (let key of keys) {
 			if (key.toString() == 'one') oneSeen = true;
@@ -76,16 +88,22 @@ export class State implements StateProps {
 		if (!oneSeen) {
 			for (let mv of markerVals) {
 				const js = JSON.stringify(mv, (k, v) => {
-					if (k == 'mrk') return null;
+					if (k == 'mrk') return undefined;
 					return v;
 				});
 				console.log('store test js', js);
-				this.idb!.put('nk', js, mv.dbFields.id);
+				if (this.idb) {
+					await this.idb.put('nk', js, mv.dbFields.id);
+				} else {
+					localStorage.setItem(mv.dbFields.id, js);
+				}
 			}
-			keys = await this.idb!.getAllKeys('nk');
+			keys = this.idb
+				? (await this.idb!.getAllKeys('nk')).map((k) => k.toString())
+				: this.getLocalStorageKeys();
 		}
 		for (let key of keys) {
-			const val = await this.idb!.get('nk', key);
+			const val = this.idb ? await this.idb.get('nk', key) : localStorage.getItem(key);
 			console.log('key', key, 'val', val);
 			const mv = JSON.parse(val) as MarkerEntry;
 			this.markerValues.push(mv);
@@ -118,7 +136,11 @@ export class State implements StateProps {
 		if (index == -1) return;
 		const id = this.markerValues[index].dbFields.id;
 		this.markerValues.splice(index, 1);
-		this.idb!.delete('nk', id);
+		if (this.idb) {
+			await this.idb!.delete('nk', id);
+		} else {
+			localStorage.removeItem(id);
+		}
 	}
 
 	updCenter(center: number[]) {
@@ -139,11 +161,15 @@ export class State implements StateProps {
 		}
 		mv.dbFields.changedAt = new Date();
 		const js = JSON.stringify(mv, (k, v) => {
-			if (k == 'mrk') return null;
+			if (k == 'mrk') return undefined;
 			return v;
 		});
 		console.log('js', js);
-		this.idb!.put('nk', js, mv.dbFields.id);
+		if (this.idb) {
+			await this.idb.put('nk', js, mv.dbFields.id);
+		} else {
+			localStorage.setItem(mv.dbFields.id, js);
+		}
 	}
 }
 

@@ -7,7 +7,10 @@ const handleAuth: Handle = async ({ event, resolve }) => {
 		event.locals.user = null;
 		event.locals.session = null;
 		// console.log('path', event.url.pathname);
-		if (!event.url.pathname.startsWith('/login')) {
+		if (
+			!event.url.pathname.startsWith('/login') &&
+			!event.url.pathname.startsWith('/notpersistent')
+		) {
 			redirect(303, '/login');
 		}
 		return resolve(event);

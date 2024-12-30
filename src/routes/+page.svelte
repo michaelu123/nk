@@ -1,12 +1,5 @@
 <script lang="ts">
-	import {
-		CloseButton,
-		Sidebar,
-		SidebarGroup,
-		SidebarItem,
-		SidebarButton,
-		uiHelpers
-	} from 'svelte-5-ui-lib';
+	import { Sidebar, SidebarGroup, SidebarItem, SidebarButton, uiHelpers } from 'svelte-5-ui-lib';
 	import { page } from '$app/stores';
 	import { getState } from '$lib/state.svelte';
 
@@ -206,7 +199,7 @@
 		const mv = markerValues[selectedMarkerIndex];
 		selectedMarkerIndex = -1;
 		mv.selected = false;
-		goto('/editnk/' + mv.dbFields.id);
+		goto('/nk/' + mv.dbFields.id);
 	}
 
 	function deleteMarker() {
@@ -226,7 +219,7 @@
 	let geoloc = $state(false);
 
 	function posSucc(pos: any) {
-		console.log('posSucc', pos);
+		// console.log('posSucc', pos);
 		const crd = pos.coords;
 		currPos = [crd.latitude, crd.longitude];
 		posTime = pos.timestamp;
