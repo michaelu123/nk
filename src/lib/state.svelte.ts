@@ -1,5 +1,6 @@
 import { getContext, setContext } from 'svelte';
 import { markerVals } from './fakeDB';
+import type { IDBPDatabase } from 'idb';
 
 export interface MarkerProps {
 	id: string;
@@ -8,12 +9,13 @@ export interface MarkerProps {
 	comment: string;
 	image: string | null;
 	lastCleaned: Date | null;
+	createdAt: Date;
+	changedAt: Date | null;
 }
 
 export interface MarkerEntry {
 	latLng: number[];
 	mrk: any | null;
-	fct: any | null;
 	selected: boolean;
 	color: 'green' | 'red';
 	dbFields: MarkerProps;
@@ -37,11 +39,17 @@ export interface User {
 
 export interface StateProps {
 	user: User | null;
+	idb: IDBPDatabase | null;
 }
+
+let mucLat = 48.137236594542834,
+	mucLng = 11.576174072626772;
 
 export class State implements StateProps {
 	user = $state<User | null>(null);
+	idb = $state<IDBPDatabase | null>(null);
 
+	defaultCenter = $state([mucLat, mucLng]);
 	markerValues = $state<MarkerEntry[]>([]);
 	maxBounds = $state([
 		[48.21736966757146, 11.411914216629935],
@@ -55,19 +63,40 @@ export class State implements StateProps {
 
 	updateState(data: StateProps) {
 		this.user = data.user;
+		this.idb = data.idb;
 		this.fetchUserData();
 	}
 
 	async fetchUserData() {
-		console.log('fetch', markerVals[0]);
-		this.markerValues = markerVals;
+		let keys = await this.idb!.getAllKeys('nk');
+		let oneSeen = false;
+		for (let key of keys) {
+			if (key.toString() == 'one') oneSeen = true;
+		}
+		if (!oneSeen) {
+			for (let mv of markerVals) {
+				const js = JSON.stringify(mv, (k, v) => {
+					if (k == 'mrk') return null;
+					return v;
+				});
+				console.log('store test js', js);
+				this.idb!.put('nk', js, mv.dbFields.id);
+			}
+			keys = await this.idb!.getAllKeys('nk');
+		}
+		for (let key of keys) {
+			const val = await this.idb!.get('nk', key);
+			console.log('key', key, 'val', val);
+			const mv = JSON.parse(val) as MarkerEntry;
+			this.markerValues.push(mv);
+		}
+		console.log('mv length', this.markerValues.length);
 	}
 
 	async addMarker(ll: any) {
 		this.markerValues.push({
 			latLng: [ll.lat, ll.lng],
 			mrk: null,
-			fct: null,
 			selected: false,
 			color: 'green',
 			dbFields: {
@@ -76,7 +105,9 @@ export class State implements StateProps {
 				kind: 'unbekannt',
 				comment: '',
 				image: null,
-				lastCleaned: null
+				lastCleaned: null,
+				createdAt: new Date(),
+				changedAt: null
 			}
 		});
 		console.log('state addMarker');
@@ -85,11 +116,20 @@ export class State implements StateProps {
 	async deleteMarker(index: number) {
 		console.log('statedm', index);
 		if (index == -1) return;
+		const id = this.markerValues[index].dbFields.id;
 		this.markerValues.splice(index, 1);
+		this.idb!.delete('nk', id);
 	}
 
-	async persist(index: number, updateObject: Partial<UpdatableMarkerFields>) {
-		const mv = this.markerValues[index];
+	updCenter(center: number[]) {
+		console.log('updCenter', center);
+		// this.defaultCenter = center; //  does not trigger state change!?
+		this.defaultCenter[0] = center[0];
+		this.defaultCenter[1] = center[1];
+		// update DB
+	}
+
+	async persist(mv: MarkerEntry, updateObject: Partial<UpdatableMarkerFields>) {
 		for (const key of Object.keys(updateObject)) {
 			console.log('key', key);
 			if (key == 'latLng') mv.latLng = updateObject.latLng!;
@@ -97,6 +137,13 @@ export class State implements StateProps {
 			if (key == 'kind') mv.dbFields.kind = updateObject.kind!;
 			if (key == 'comment') mv.dbFields.comment = updateObject.comment!;
 		}
+		mv.dbFields.changedAt = new Date();
+		const js = JSON.stringify(mv, (k, v) => {
+			if (k == 'mrk') return null;
+			return v;
+		});
+		console.log('js', js);
+		this.idb!.put('nk', js, mv.dbFields.id);
 	}
 }
 

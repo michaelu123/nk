@@ -11,8 +11,9 @@
 	import { getState } from '$lib/state.svelte';
 
 	let nkState = getState();
-	let { markerValues, maxBounds } = nkState;
-	$inspect('markerValues', markerValues);
+	let { markerValues, maxBounds, defaultCenter } = nkState;
+	// $inspect('markerValues', markerValues);
+	$inspect('defaultCenter1', defaultCenter);
 	let activeUrl = $state($page.url.pathname);
 	const spanClass = 'flex-1 ms-3 whitespace-nowrap';
 	const sidebarUi = uiHelpers();
@@ -41,7 +42,6 @@
 	let selectedMarkerIndex = -1;
 	let mucLat = 48.137236594542834,
 		mucLng = 11.576174072626772;
-	let defaultCenter = $state([mucLat, mucLng]);
 	let currPos = $state([mucLat, mucLng]);
 	let posTime = $state(Date.now()); // TODO weg
 	let nowTime = $state(Date.now());
@@ -86,7 +86,7 @@
 	});
 
 	$effect(() => {
-		console.log('effect markers');
+		// console.log('effect markers');
 		markers();
 	});
 
@@ -94,14 +94,15 @@
 
 	function markers() {
 		for (const [index, mv] of markerValues.entries()) {
-			console.log('setfct1', mv.dbFields.name, mv.mrk);
+			// console.log('setfct1', mv.dbFields.name, mv.mrk);
 			if (mv.mrk) {
 				const newfct = (e: any) => mclick(index, e);
 				const oldfct = fctMap.get(mv.dbFields.id);
-				console.log('setfct2', oldfct, newfct);
+				// console.log('setfct2', oldfct, newfct);
 				if (oldfct) {
 					mv.mrk.off('click', oldfct);
 				}
+				// mv.mrk.clearAllEventListeners(); or mv.mrk.off() does not have the same effect!?
 				mv.mrk.on('click', newfct);
 				fctMap.set(mv.dbFields.id, newfct);
 			}
@@ -129,7 +130,7 @@
 			map.off('move', onMapMove);
 			centering = false;
 			const mv = markerValues[selectedMarkerIndex];
-			nkState.persist(selectedMarkerIndex, { latLng: mv.latLng });
+			nkState.persist(mv, { latLng: mv.latLng });
 		}
 		if (selectedMarkerIndex == -1) {
 			const mv = markerValues[index];
@@ -205,7 +206,7 @@
 		const mv = markerValues[selectedMarkerIndex];
 		selectedMarkerIndex = -1;
 		mv.selected = false;
-		goto('/editnk/' + index);
+		goto('/editnk/' + mv.dbFields.id);
 	}
 
 	function deleteMarker() {
@@ -217,6 +218,7 @@
 
 	function centerMap() {
 		map.flyTo(currPos, map.getZoom());
+		nkState.updCenter(currPos);
 	}
 
 	let locid = -1;
@@ -232,7 +234,7 @@
 
 	function posErr(err: any) {
 		console.log('Error', err);
-		posRestart();
+		// posRestart();
 	}
 
 	function posRestart() {

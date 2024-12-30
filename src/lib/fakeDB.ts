@@ -7,7 +7,6 @@ export let markerVals: MarkerEntry[] = [
 	{
 		latLng: [mucLat + 0.001, mucLng + 0.001],
 		mrk: null,
-		fct: null,
 		selected: false,
 		dbFields: {
 			id: 'one',
@@ -15,14 +14,15 @@ export let markerVals: MarkerEntry[] = [
 			kind: 'FK',
 			comment: 'comment1',
 			image: null,
-			lastCleaned: new Date(2022, 1, 2)
+			lastCleaned: new Date(2022, 1, 1, 12),
+			createdAt: new Date(2022, 1, 1, 12),
+			changedAt: null
 		},
 		color: 'green'
 	},
 	{
 		latLng: [mucLat - 0.001, mucLng + 0.001],
 		mrk: null,
-		fct: null,
 		selected: false,
 		dbFields: {
 			id: 'two',
@@ -30,14 +30,15 @@ export let markerVals: MarkerEntry[] = [
 			kind: 'HK',
 			comment: 'comment2',
 			image: null,
-			lastCleaned: new Date(2022, 1, 2)
+			lastCleaned: new Date(2022, 1, 2, 12),
+			createdAt: new Date(2022, 1, 2, 12),
+			changedAt: null
 		},
 		color: 'red'
 	},
 	{
 		latLng: [mucLat + 0.001, mucLng - 0.001],
 		mrk: null,
-		fct: null,
 		selected: false,
 		dbFields: {
 			id: 'three',
@@ -45,14 +46,15 @@ export let markerVals: MarkerEntry[] = [
 			kind: 'BK',
 			comment: 'comment3',
 			image: null,
-			lastCleaned: new Date(2022, 1, 2)
+			lastCleaned: new Date(2022, 1, 3, 12),
+			createdAt: new Date(2022, 1, 3, 12),
+			changedAt: null
 		},
 		color: 'green'
 	},
 	{
 		latLng: [mucLat - 0.001, mucLng - 0.001],
 		mrk: null,
-		fct: null,
 		selected: false,
 		dbFields: {
 			id: 'four',
@@ -60,7 +62,9 @@ export let markerVals: MarkerEntry[] = [
 			kind: 'XK',
 			comment: 'comment4',
 			image: null,
-			lastCleaned: new Date(2022, 1, 2)
+			lastCleaned: new Date(2022, 1, 4, 12),
+			createdAt: new Date(2022, 1, 4, 12),
+			changedAt: null
 		},
 		color: 'red'
 	}
