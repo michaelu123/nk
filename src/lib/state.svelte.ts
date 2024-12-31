@@ -40,6 +40,7 @@ export interface User {
 export interface StateProps {
 	user: User | null;
 	idb: IDBPDatabase | null;
+	bucket: any | null;
 }
 
 let mucLat = 48.137236594542834,
@@ -47,7 +48,8 @@ let mucLat = 48.137236594542834,
 
 export class State implements StateProps {
 	user = $state<User | null>(null);
-	idb = $state<IDBPDatabase | null>(null);
+	idb: IDBPDatabase | null = null;
+	bucket: any | null = null;
 
 	defaultCenter = $state([mucLat, mucLng]);
 	markerValues = $state<MarkerEntry[]>([]);
@@ -57,13 +59,13 @@ export class State implements StateProps {
 	]);
 
 	constructor(data: StateProps) {
-		console.log('State constructor');
 		this.updateState(data);
 	}
 
 	updateState(data: StateProps) {
 		this.user = data.user;
 		this.idb = data.idb;
+		this.bucket = data.bucket; // keep a ref to bucket, so that it does not close
 		this.fetchUserData();
 	}
 
@@ -79,7 +81,7 @@ export class State implements StateProps {
 
 	async fetchUserData() {
 		let keys = this.idb
-			? (await this.idb!.getAllKeys('nk')).map((k) => k.toString())
+			? (await this.idb.getAllKeys('nk')).map((k) => k.toString())
 			: this.getLocalStorageKeys();
 		let oneSeen = false;
 		for (let key of keys) {
@@ -91,7 +93,6 @@ export class State implements StateProps {
 					if (k == 'mrk') return undefined;
 					return v;
 				});
-				console.log('store test js', js);
 				if (this.idb) {
 					await this.idb.put('nk', js, mv.dbFields.id);
 				} else {
@@ -104,11 +105,9 @@ export class State implements StateProps {
 		}
 		for (let key of keys) {
 			const val = this.idb ? await this.idb.get('nk', key) : localStorage.getItem(key);
-			console.log('key', key, 'val', val);
 			const mv = JSON.parse(val) as MarkerEntry;
 			this.markerValues.push(mv);
 		}
-		console.log('mv length', this.markerValues.length);
 	}
 
 	async addMarker(ll: any) {
@@ -128,11 +127,9 @@ export class State implements StateProps {
 				changedAt: null
 			}
 		});
-		console.log('state addMarker');
 	}
 
 	async deleteMarker(index: number) {
-		console.log('statedm', index);
 		if (index == -1) return;
 		const id = this.markerValues[index].dbFields.id;
 		this.markerValues.splice(index, 1);
@@ -144,7 +141,6 @@ export class State implements StateProps {
 	}
 
 	updCenter(center: number[]) {
-		console.log('updCenter', center);
 		// this.defaultCenter = center; //  does not trigger state change!?
 		this.defaultCenter[0] = center[0];
 		this.defaultCenter[1] = center[1];
@@ -153,7 +149,6 @@ export class State implements StateProps {
 
 	async persist(mv: MarkerEntry, updateObject: Partial<UpdatableMarkerFields>) {
 		for (const key of Object.keys(updateObject)) {
-			console.log('key', key);
 			if (key == 'latLng') mv.latLng = updateObject.latLng!;
 			if (key == 'name') mv.dbFields.name = updateObject.name!;
 			if (key == 'kind') mv.dbFields.kind = updateObject.kind!;
@@ -164,9 +159,12 @@ export class State implements StateProps {
 			if (k == 'mrk') return undefined;
 			return v;
 		});
-		console.log('js', js);
 		if (this.idb) {
-			await this.idb.put('nk', js, mv.dbFields.id);
+			try {
+				await this.idb.put('nk', js, mv.dbFields.id);
+			} catch (e: any) {
+				console.log('err idb.put', e);
+			}
 		} else {
 			localStorage.setItem(mv.dbFields.id, js);
 		}
