@@ -4,9 +4,7 @@
 	import { getState } from '$lib/state.svelte';
 
 	let nkState = getState();
-	let { markerValues, maxBounds, defaultCenter } = nkState;
-	// $inspect('markerValues', markerValues);
-	$inspect('defaultCenter1', defaultCenter);
+	let { markerValues, maxBounds, defaultCenter } = $derived(nkState);
 	let activeUrl = $state($page.url.pathname);
 	const spanClass = 'flex-1 ms-3 whitespace-nowrap';
 	const sidebarUi = uiHelpers();
@@ -107,17 +105,17 @@
 	}
 
 	function mclick(index: number, e: any) {
-		console.log(
-			'mc1',
-			'index',
-			selectedMarkerIndex,
-			'centering',
-			centering,
-			'selected',
-			markerValues[index].selected,
-			'event',
-			e
-		);
+		// console.log(
+		// 	'mc1',
+		// 	'index',
+		// 	selectedMarkerIndex,
+		// 	'centering',
+		// 	centering,
+		// 	'selected',
+		// 	markerValues[index].selected,
+		// 	'event',
+		// 	e
+		// );
 
 		if (centering) {
 			map.off('move', onMapMove);
@@ -143,15 +141,16 @@
 			mv.selected = true;
 			selectedMarkerIndex = index;
 		}
-		console.log(
-			'mc2',
-			'index',
-			selectedMarkerIndex,
-			'centering',
-			centering,
-			'selected',
-			markerValues[index].selected
-		);
+		// console.log(
+		// 	'mc2',
+		// 	'index',
+		// 	selectedMarkerIndex,
+		// 	'centering',
+		// 	centering,
+		// 	'selected',
+		// 	markerValues[index].selected
+		// );
+
 		// center = map.getCenter(); // to reposition
 	}
 
@@ -165,7 +164,7 @@
 	function onMapMove(e: any) {
 		const center = map.getCenter();
 		markerValues[selectedMarkerIndex].latLng = center;
-		console.log('omm');
+		// console.log('omm');
 	}
 
 	function logmap() {
@@ -209,9 +208,13 @@
 		selectedMarkerIndex = -1;
 	}
 
-	function centerMap() {
-		map.flyTo(currPos, map.getZoom());
-		nkState.updCenter(currPos);
+	function centerMap(pos: number[]) {
+		console.log('centerMap', pos, 'dc', defaultCenter);
+		map.flyTo(pos, map.getZoom());
+	}
+
+	function updDefaultCenter() {
+		nkState.updDefaultCenter(map.getCenter());
 	}
 
 	let locid = -1;
@@ -266,10 +269,9 @@
 		<div class="w-full"></div>
 		<Button outline pill onclick={logmap}>?</Button>
 		<Button outline pill onclick={() => nkState.addMarker(map.getCenter())}>+</Button>
-		<Button outline pill onclick={centerMap}>{'\u2316'}</Button>
+		<Button outline pill onclick={() => centerMap(currPos)}>{'\u2316'}</Button>
 		<Button outline pill onclick={posNow}>{'>'}</Button>
-		<!-- <button class="btn bg-red-400" onclick={() => (showNav.value = !showNav.value)}>nav</button>
-		<button class="btn bg-red-400 text-lg" onclick={toggleDL}>{'\u263E/\u263C'}</button> -->
+		<Button outline pill onclick={toggleDL}>{'\u263E\u263C'}</Button>
 	</div>
 {/snippet}
 
@@ -359,7 +361,8 @@
 			class="absolute right-2 top-2 p-2 md:hidden"
 		/> -->
 		<SidebarGroup border={false}>
-			<SidebarItem label="Dashboard" href="/"></SidebarItem>
+			<SidebarItem label="Neues Zentrum" onclick={updDefaultCenter}></SidebarItem>
+			<SidebarItem label="Zum Zentrum" onclick={() => centerMap(defaultCenter)}></SidebarItem>
 			<SidebarItem label="Kanban" {spanClass} href="/"></SidebarItem>
 			<SidebarItem label="Inbox" {spanClass} href="/"></SidebarItem>
 			<SidebarItem label="Sidebar" href="/components/sidebar"></SidebarItem>

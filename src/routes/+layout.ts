@@ -1,12 +1,11 @@
 import type { LayoutLoad } from './$types';
 import { browser } from '$app/environment';
 import { openDB, type IDBPDatabase, wrap } from 'idb';
-import { redirect } from '@sveltejs/kit';
+// import { redirect } from '@sveltejs/kit';
 
 export const load: LayoutLoad = async ({ data, url }) => {
 	console.log('+layout.ts', browser, url);
 	const { user } = data;
-	console.log('1load');
 	if (browser) {
 		if ('storageBuckets' in navigator) {
 			// https://developer.chrome.com/blog/maximum-idb-performance-with-storage-buckets?hl=de
@@ -36,7 +35,6 @@ export const load: LayoutLoad = async ({ data, url }) => {
 					}
 				);
 				const idb: IDBPDatabase | null = await wrap(idbUnwrapped);
-				console.log('5load', idb);
 				return { bucket, idb, user };
 			} else {
 				console.log('storageBucket not persisted, use localstorage');
@@ -46,14 +44,13 @@ export const load: LayoutLoad = async ({ data, url }) => {
 		if (navigator.storage && navigator.storage.persist) {
 			const persistent = await navigator.storage.persist();
 			if (persistent) {
-				console.log('6load');
 				let idb: IDBPDatabase | null = await openDB('NK', 1, {
 					upgrade(db) {
 						db.createObjectStore('settings');
 						db.createObjectStore('nk');
 					}
 				});
-				console.log('localStorage is persistent');
+				console.log('indexeddb is persistent');
 				const persisted = await navigator.storage.persisted();
 				if (persisted) {
 					console.log('Storage will not be cleared except by explicit user action');
@@ -62,9 +59,8 @@ export const load: LayoutLoad = async ({ data, url }) => {
 				}
 				return { idb, user, bucket: null };
 			} else {
-				console.log('localStorage is not persistent, use ');
+				console.log('indexeddb is not persistent, use localStorage...');
 				// if (url.pathname != '/notpersistent') redirect(302, '/notpersistent');
-				// use localStorage...
 			}
 		}
 	}

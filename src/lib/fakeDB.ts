@@ -11,7 +11,7 @@ export let markerVals: MarkerEntry[] = [
 		dbFields: {
 			id: 'one',
 			name: 'one',
-			kind: 'FK',
+			nkType: 'FK',
 			comment: 'comment1',
 			image: null,
 			lastCleaned: new Date(2022, 1, 1, 12),
@@ -27,7 +27,7 @@ export let markerVals: MarkerEntry[] = [
 		dbFields: {
 			id: 'two',
 			name: 'two',
-			kind: 'HK',
+			nkType: 'HK',
 			comment: 'comment2',
 			image: null,
 			lastCleaned: new Date(2022, 1, 2, 12),
@@ -43,7 +43,7 @@ export let markerVals: MarkerEntry[] = [
 		dbFields: {
 			id: 'three',
 			name: 'three',
-			kind: 'BK',
+			nkType: 'BK',
 			comment: 'comment3',
 			image: null,
 			lastCleaned: new Date(2022, 1, 3, 12),
@@ -59,7 +59,7 @@ export let markerVals: MarkerEntry[] = [
 		dbFields: {
 			id: 'four',
 			name: 'four',
-			kind: 'XK',
+			nkType: 'XK',
 			comment: 'comment4',
 			image: null,
 			lastCleaned: new Date(2022, 1, 4, 12),
@@ -68,4 +68,31 @@ export let markerVals: MarkerEntry[] = [
 		},
 		color: 'red'
 	}
+];
+
+export let nkDefaultTypes = [
+	'Flachkasten',
+	'Holzkasten',
+	'Holzbetonkasten',
+	'FL-Winterkasten',
+	'FL-0',
+	'FL-1',
+	'FL-2',
+	'FL-3',
+	'FL-4',
+	'FL-5',
+	'FL-6',
+	'FL-7',
+	'FL-8',
+	'FL-9',
+	'FL-10',
+	'FL-11',
+	'FL-12',
+	'FL-13',
+	'FL-14',
+	'FL-15',
+	'FL-16',
+	'FL-17',
+	'FL-18',
+	'FL-19'
 ];

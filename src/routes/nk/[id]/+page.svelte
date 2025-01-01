@@ -2,26 +2,28 @@
 	import { goto } from '$app/navigation';
 	import { getState } from '$lib/state.svelte';
 	import { redirect } from '@sveltejs/kit';
+	import { Textarea, Label, Button, Input } from 'svelte-5-ui-lib';
+
+	let nkState = getState();
+	let { nkTypes } = $derived(nkState);
+
 	let { data } = $props();
 	if (!data.id) {
 		redirect(302, '/');
 	}
 	let id = $derived(data.id);
-	$inspect('id', id);
 	console.log('page id', data.id);
-	let nkState = getState();
 	let { markerValues } = nkState;
 	let mv = $derived(markerValues.find((m) => m.dbFields.id == id));
-	$inspect('mv', mv);
-	let isEditMode = $state(false);
+	let isEditMode = $state(true);
 
 	let name = $state('');
-	let kind = $state('');
+	let nkType = $state('');
 	let comment = $state('');
 	$effect(() => {
 		if (mv) {
 			name = mv.dbFields.name;
-			kind = mv.dbFields.kind;
+			nkType = mv.dbFields.nkType;
 			comment = mv.dbFields.comment;
 		}
 	});
@@ -30,35 +32,70 @@
 		history.back();
 	}
 
+	function goMap() {
+		goto('/');
+	}
+
 	async function toggleEditModeAndSaveToDatabase() {
 		if (isEditMode && mv) {
-			await nkState.persist(mv, { name, kind, comment });
+			await nkState.persist(mv, { name, nkType, comment });
+			await nkState.updNkTypes(nkType);
 		}
 		isEditMode = !isEditMode;
 	}
+
+	let nkTypeList: string[] = $derived.by(() => {
+		let keys = nkTypes.keys().toArray();
+		let uc = nkType.toUpperCase();
+		keys = keys.filter((k) => k.toUpperCase().includes(uc));
+		keys = keys.toSorted((b, a) => nkTypes.get(a)! - nkTypes.get(b)!);
+		keys = keys.slice(0, 8);
+		return keys;
+	});
 </script>
 
 {#if mv}
-	<h1>Nistkasten</h1>
+	<h1 class="mt-8 text-center text-2xl font-semibold">Nistkasten</h1>
 	{#if isEditMode}
-		<input type="text" name="name" class="input" bind:value={name} />
-		<input type="text" name="kind" class="input" bind:value={kind} />
-		<textarea name="kind" class="input" bind:value={comment}></textarea>
+		<form class="m-4 flex flex-col items-baseline gap-4">
+			<div class="flex flex-row">
+				<Label class="w-40" for="name_id">Name:</Label>
+				<Input type="text" id="name_id" name="name" class="input" bind:value={name} />
+			</div>
+			<div class="flex flex-row">
+				<Label class="w-40" for="nktype_id">Typ:</Label>
+				<Input list="nktypelist" id="nktype_id" name="nktype" bind:value={nkType} />
+
+				<datalist id="nktypelist">
+					{#each nkTypeList as nkt}
+						<option value={nkt}></option>
+					{/each}
+				</datalist>
+			</div>
+
+			<div class="flex flex-row">
+				<Label class="w-40" for="comment_id">Bemerkungen</Label>
+				<Textarea name="comment" id="comment_id" bind:value={comment}></Textarea>
+			</div>
+		</form>
 	{:else}
 		<h2>Name {name}</h2>
-		<h2>Art {kind}</h2>
+		<h2>Art {nkType}</h2>
 		<h2>Kommentar {comment}</h2>
 	{/if}
 	<h2>Zuletzt {mv.dbFields.lastCleaned}</h2>
 
-	<button onclick={toggleEditModeAndSaveToDatabase}>{isEditMode ? 'Save' : 'Edit'}</button>
-	<a href="/nk/0">ZERO</a>
-	<a href="/nk/1">ONE</a>
-	<a href="/nk/2">TWO</a>
-	<a href="/nk/3">THREE</a>
-	<button onclick={() => goto('/nk/0')}>BZERO</button>
-	<button onclick={() => goto('/nk/1')}>BONE</button>
-	<button onclick={() => goto('/nk/2')}>BTWO</button>
-	<button onclick={() => goto('/nk/3')}>BTHREE</button>
-	<button onclick={goBack}>Back</button>
+	<Button onclick={toggleEditModeAndSaveToDatabase}>{isEditMode ? 'Save' : 'Edit'}</Button>
+	<a href="/nk/one">ONE</a>
+	<a href="/nk/two">TWO</a>
+	<a href="/nk/three">THREE</a>
+	<a href="/nk/four">FOUR</a>
+	<Button onclick={() => goto('/nk/one')}>BONE</Button>
+	<Button onclick={() => goto('/nk/two')}>BTWO</Button>
+	<Button onclick={() => goto('/nk/three')}>BTHREE</Button>
+	<Button onclick={() => goto('/nk/four')}>BFOUR</Button>
+	<Button onclick={goBack}>Back</Button>
+	<Button onclick={goMap}>Map</Button>
 {/if}
+
+<h2>{nkType}</h2>

@@ -1,11 +1,11 @@
 import { getContext, setContext } from 'svelte';
-import { markerVals } from './fakeDB';
+import { markerVals, nkDefaultTypes } from './fakeDB';
 import type { IDBPDatabase } from 'idb';
 
 export interface MarkerProps {
 	id: string;
 	name: string;
-	kind: string;
+	nkType: string;
 	comment: string;
 	image: string | null;
 	lastCleaned: Date | null;
@@ -28,7 +28,7 @@ export interface MarkerEntry {
 type UpdatableMarkerFields = {
 	latLng: number[];
 	name: string;
-	kind: string;
+	nkType: string;
 	comment: string;
 };
 
@@ -57,6 +57,7 @@ export class State implements StateProps {
 		[48.21736966757146, 11.411914216629935],
 		[48.0478968379877, 11.702028367388204]
 	]);
+	nkTypes: Map<string, number> = $state(new Map());
 
 	constructor(data: StateProps) {
 		this.updateState(data);
@@ -79,7 +80,34 @@ export class State implements StateProps {
 		return res;
 	}
 
-	async fetchUserData() {
+	async fetchNkTypesData() {
+		let nktypes: string[] = [];
+		const nval = this.idb
+			? await this.idb.get('settings', 'nktypes')
+			: localStorage.getItem('_nktypes');
+		if (nval) {
+			nktypes = JSON.parse(nval);
+		} else {
+			// seed nktypes
+			const nktypes = nkDefaultTypes;
+			const js = JSON.stringify(nktypes);
+			console.log('upd js', js, 'nktypes', this.nkTypes);
+			if (this.idb) {
+				try {
+					await this.idb.put('settings', js, 'nktypes');
+				} catch (e: any) {
+					console.log('err idb.put', e);
+				}
+			} else {
+				localStorage.setItem('_nktypes', js);
+			}
+		}
+		for (const nkt of nktypes) {
+			this.nkTypes.set(nkt, 0);
+		}
+	}
+
+	async fetchMarkersData() {
 		let keys = this.idb
 			? (await this.idb.getAllKeys('nk')).map((k) => k.toString())
 			: this.getLocalStorageKeys();
@@ -87,6 +115,8 @@ export class State implements StateProps {
 		for (let key of keys) {
 			if (key.toString() == 'one') oneSeen = true;
 		}
+
+		// seed Markers
 		if (!oneSeen) {
 			for (let mv of markerVals) {
 				const js = JSON.stringify(mv, (k, v) => {
@@ -103,11 +133,30 @@ export class State implements StateProps {
 				? (await this.idb!.getAllKeys('nk')).map((k) => k.toString())
 				: this.getLocalStorageKeys();
 		}
+
 		for (let key of keys) {
 			const val = this.idb ? await this.idb.get('nk', key) : localStorage.getItem(key);
 			const mv = JSON.parse(val) as MarkerEntry;
 			this.markerValues.push(mv);
+			this.updNkTypes(mv.dbFields.nkType);
 		}
+		console.log('fetch nktypes', this.nkTypes);
+	}
+
+	async fetchCenterData() {
+		const cval = this.idb
+			? await this.idb.get('settings', 'center')
+			: localStorage.getItem('_center');
+		if (cval) {
+			const center = JSON.parse(cval) as number[];
+			this.defaultCenter = center;
+		}
+	}
+
+	async fetchUserData() {
+		await this.fetchNkTypesData();
+		await this.fetchMarkersData();
+		await this.fetchCenterData();
 	}
 
 	async addMarker(ll: any) {
@@ -119,7 +168,7 @@ export class State implements StateProps {
 			dbFields: {
 				id: Date.now().toString(),
 				name: 'unbekannt',
-				kind: 'unbekannt',
+				nkType: 'unbekannt',
 				comment: '',
 				image: null,
 				lastCleaned: null,
@@ -140,18 +189,23 @@ export class State implements StateProps {
 		}
 	}
 
-	updCenter(center: number[]) {
+	async updDefaultCenter(center: number[]) {
 		// this.defaultCenter = center; //  does not trigger state change!?
-		this.defaultCenter[0] = center[0];
-		this.defaultCenter[1] = center[1];
-		// update DB
+		this.defaultCenter = center;
+		const js = JSON.stringify(this.defaultCenter);
+		console.log('upd js', js, 'center', center, 'dc', this.defaultCenter);
+		if (this.idb) {
+			await this.idb.put('settings', js, 'center');
+		} else {
+			localStorage.setItem('_center', js);
+		}
 	}
 
 	async persist(mv: MarkerEntry, updateObject: Partial<UpdatableMarkerFields>) {
 		for (const key of Object.keys(updateObject)) {
 			if (key == 'latLng') mv.latLng = updateObject.latLng!;
 			if (key == 'name') mv.dbFields.name = updateObject.name!;
-			if (key == 'kind') mv.dbFields.kind = updateObject.kind!;
+			if (key == 'nkType') mv.dbFields.nkType = updateObject.nkType!;
 			if (key == 'comment') mv.dbFields.comment = updateObject.comment!;
 		}
 		mv.dbFields.changedAt = new Date();
@@ -167,6 +221,16 @@ export class State implements StateProps {
 			}
 		} else {
 			localStorage.setItem(mv.dbFields.id, js);
+		}
+	}
+
+	async updNkTypes(nkType: string) {
+		if (!nkType) return;
+		let count = this.nkTypes.get(nkType);
+		if (count) {
+			this.nkTypes.set(nkType, count + 1);
+		} else {
+			this.nkTypes.set(nkType, 1);
 		}
 	}
 }
