@@ -2,7 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { getState } from '$lib/state.svelte';
 	import { redirect } from '@sveltejs/kit';
-	import { Textarea, Label, Button, Input } from 'svelte-5-ui-lib';
+	import { Textarea, Label, Button, Input, Select } from 'svelte-5-ui-lib';
 
 	let nkState = getState();
 	let { nkTypes } = $derived(nkState);
@@ -64,15 +64,22 @@
 			</div>
 			<div class="flex flex-row">
 				<Label class="w-40" for="nktype_id">Typ:</Label>
-				<Input list="nktypelist" id="nktype_id" name="nktype" bind:value={nkType} />
-
+				<Input list="nktypelist" id="nktype_id" name="nktype" type="text" bind:value={nkType} />
 				<datalist id="nktypelist">
 					{#each nkTypeList as nkt}
 						<option value={nkt}></option>
 					{/each}
 				</datalist>
 			</div>
-
+			<!-- datalist does currently not work on Android Chrome! -->
+			<div class="flex w-full flex-row">
+				<Label class="w-40" for="nktype_select">Vordef:</Label>
+				<Select class="mr-1" name="nktypeA" id="nktype-select" bind:value={nkType}>
+					{#each nkTypeList as nkt}
+						<option value={nkt}>{nkt}</option>
+					{/each}
+				</Select>
+			</div>
 			<div class="flex flex-row">
 				<Label class="w-40" for="comment_id">Bemerkungen</Label>
 				<Textarea name="comment" id="comment_id" bind:value={comment}></Textarea>

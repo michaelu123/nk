@@ -211,10 +211,12 @@
 	function centerMap(pos: number[]) {
 		console.log('centerMap', pos, 'dc', defaultCenter);
 		map.flyTo(pos, map.getZoom());
+		isSidebarOpen = false;
 	}
 
 	function updDefaultCenter() {
 		nkState.updDefaultCenter(map.getCenter());
+		isSidebarOpen = false;
 	}
 
 	let locid = -1;
@@ -271,7 +273,7 @@
 		<Button outline pill onclick={() => nkState.addMarker(map.getCenter())}>+</Button>
 		<Button outline pill onclick={() => centerMap(currPos)}>{'\u2316'}</Button>
 		<Button outline pill onclick={posNow}>{'>'}</Button>
-		<Button outline pill onclick={toggleDL}>{'\u263E\u263C'}</Button>
+		<!--Button outline pill onclick={toggleDL}>{'\u263E\u263C'}</Button-->
 	</div>
 {/snippet}
 
