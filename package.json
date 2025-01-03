@@ -43,6 +43,7 @@
 		"idb": "^8.0.1",
 		"leaflet": "^1.9.4",
 		"mysql2": "^3.11.0",
-		"sveaflet": "^0.0.11"
+		"sveaflet": "^0.0.11",
+		"svelte-file-dropzone": "^2.0.9"
 	}
 }

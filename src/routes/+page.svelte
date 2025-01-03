@@ -23,7 +23,8 @@
 		Icon,
 		ControlZoom,
 		ControlAttribution,
-		Polygon
+		Polygon,
+		Circle
 	} from 'sveaflet';
 	import { Button } from 'svelte-5-ui-lib';
 
@@ -34,11 +35,12 @@
 	let mucLat = 48.137236594542834,
 		mucLng = 11.576174072626772;
 	let currPos = $state([mucLat, mucLng]);
-	let posTime = $state(Date.now()); // TODO weg
-	let nowTime = $state(Date.now());
+	let radius = $state(100);
+	// let posTime = $state(Date.now()); // TODO weg
+	// let nowTime = $state(Date.now());
 	let defaultZoom = 15;
 
-	window.setInterval(() => (nowTime = Date.now()), 1000); // TODO weg
+	// window.setInterval(() => (nowTime = Date.now()), 1000);
 
 	const commonIconOptions = {
 		iconSize: [40, 40], // size of the icon
@@ -108,6 +110,8 @@
 		// console.log(
 		// 	'mc1',
 		// 	'index',
+		// 	index,
+		// 	'selindex',
 		// 	selectedMarkerIndex,
 		// 	'centering',
 		// 	centering,
@@ -127,9 +131,6 @@
 			const mv = markerValues[index];
 			mv.selected = true;
 			selectedMarkerIndex = index;
-			// for (const [ix, mv] of markerValues.entries()) {
-			// 	mv.selected = index === ix;
-			// }
 		} else if (index == selectedMarkerIndex) {
 			const mv = markerValues[index];
 			mv.selected = false;
@@ -155,9 +156,11 @@
 	}
 
 	function onMapClick(e: any) {
+		console.log('omc', selectedMarkerIndex);
 		if (selectedMarkerIndex != -1) {
 			const mv = markerValues[selectedMarkerIndex];
 			mv.selected = false;
+			selectedMarkerIndex = -1;
 		}
 	}
 
@@ -192,6 +195,10 @@
 		console.log('to2', selectedMarkerIndex, centering);
 	}
 
+	function addMarker() {
+		const id = nkState.addMarker(map.getCenter());
+		goto('/nk/' + id);
+	}
 	function editMarker() {
 		if (selectedMarkerIndex == -1) return;
 		const index = selectedMarkerIndex;
@@ -224,10 +231,11 @@
 	let geoloc = $state(false);
 
 	function posSucc(pos: any) {
-		// console.log('posSucc', pos);
+		console.log('posSucc', pos);
 		const crd = pos.coords;
 		currPos = [crd.latitude, crd.longitude];
-		posTime = pos.timestamp;
+		// posTime = pos.timestamp;
+		radius = pos.coords.accuracy / 2;
 	}
 
 	function posErr(err: any) {
@@ -262,6 +270,9 @@
 	function posNow() {
 		console.log('posNow');
 		navigator.geolocation.getCurrentPosition(posSucc, posErr);
+		for (let mv of markerValues) {
+			console.log('mv1', mv);
+		}
 	}
 </script>
 
@@ -270,7 +281,7 @@
 		<SidebarButton onclick={sidebarUi.toggle} class="mb-2" breakpoint="md" />
 		<div class="w-full"></div>
 		<Button outline pill onclick={logmap}>?</Button>
-		<Button outline pill onclick={() => nkState.addMarker(map.getCenter())}>+</Button>
+		<Button outline pill onclick={addMarker}>+</Button>
 		<Button outline pill onclick={() => centerMap(currPos)}>{'\u2316'}</Button>
 		<Button outline pill onclick={posNow}>{'>'}</Button>
 		<!--Button outline pill onclick={toggleDL}>{'\u263E\u263C'}</Button-->
@@ -279,69 +290,76 @@
 
 {#snippet svmap()}
 	<div style="width:100%;height:80vh;">
-		<SVMap
-			bind:instance={map}
-			options={{
-				center: defaultCenter,
-				zoom: defaultZoom,
-				maxZoom: 18,
-				minZoom: 10,
-				zoomControl: false,
-				attributionControl: true,
-				maxBounds
-			}}
-		>
-			<p id="crosshair">{'\u2316'}</p>
-			<Polygon
-				latLngs={[
-					[maxBounds[0][0], maxBounds[0][1]],
-					[maxBounds[0][0], maxBounds[1][1]],
-					[maxBounds[1][0], maxBounds[1][1]],
-					[maxBounds[1][0], maxBounds[0][1]]
-				]}
-				options={{ fill: false }}
-			/>
-			<TileLayer
-				url={'https://tile.openstreetmap.org/{z}/{x}/{y}.png'}
-				attribution={'&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'}
-			/>
-			<ControlZoom options={{ position: 'topright' }} />
-			<ControlAttribution
+		{#key defaultCenter}
+			<SVMap
+				bind:instance={map}
 				options={{
-					prefix:
-						'&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+					center: defaultCenter,
+					zoom: defaultZoom,
+					maxZoom: 20,
+					minZoom: 10,
+					zoomControl: false,
+					attributionControl: true,
+					maxBounds
 				}}
-			/>
-			{#key currPos}
-				<Marker latLng={currPos}>
-					<Popup class="w-20 text-center">
-						Age: {Math.round((nowTime - posTime) / 1000)} // TODO weg
-					</Popup>
-				</Marker>
-			{/key}
-			{#each markerValues as mv, index (mv['latLng'])}
-				<Marker latLng={mv.latLng} bind:instance={mv.mrk} {index}>
-					{#key mv.selected}
-						<Icon
-							options={mv.selected
-								? selectedMarkerOptions
-								: mv.color == 'red'
-									? redMarkerOptions
-									: greenMarkerOptions}
-						/>
-						<Popup class="flex w-20 flex-col items-center">
-							{mv.dbFields.name}
-							{#if mv.selected}
-								<Button class="btn m-1 bg-red-400" onclick={moveMarker}>Verschieben</Button>
-								<Button class="btn m-1 bg-red-400" onclick={editMarker}>Details</Button>
-								<Button class="btn m-1 bg-red-400" onclick={deleteMarker}>Löschen</Button>
-								<Button class="btn m-1 bg-red-400" onclick={toggleMarker}>Kontrolle</Button>
-							{/if}
-						</Popup>
-					{/key}
-				</Marker>
-			{/each}
-		</SVMap>
+			>
+				<p id="crosshair">{'\u2316'}</p>
+				<Polygon
+					latLngs={[
+						[maxBounds[0][0], maxBounds[0][1]],
+						[maxBounds[0][0], maxBounds[1][1]],
+						[maxBounds[1][0], maxBounds[1][1]],
+						[maxBounds[1][0], maxBounds[0][1]]
+					]}
+					options={{ fill: false }}
+				/>
+				<TileLayer
+					url={'https://tile.openstreetmap.org/{z}/{x}/{y}.png'}
+					attribution={'&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'}
+					options={{
+						maxNativeZoom: 19,
+						maxZoom: 20
+					}}
+				></TileLayer>
+				<ControlZoom options={{ position: 'topright' }} />
+				<ControlAttribution
+					options={{
+						prefix:
+							'&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+					}}
+				/>
+				{#key currPos}
+					<Marker latLng={currPos}>
+						<!-- <Popup class="w-20 text-center">
+						Age: {Math.round((nowTime - posTime) / 1000)}
+					</Popup> -->
+					</Marker>
+					<Circle latLng={currPos} options={{ radius, fillOpacity: 0.1 }} />
+				{/key}
+				{#each markerValues as mv, index (mv['latLng'])}
+					<Marker latLng={mv.latLng} bind:instance={mv.mrk} {index}>
+						{#key mv.selected}
+							<Icon
+								options={mv.selected
+									? selectedMarkerOptions
+									: mv.color == 'red'
+										? redMarkerOptions
+										: greenMarkerOptions}
+							/>
+							<Popup class="flex w-28 flex-col items-center">
+								{mv.dbFields.name}
+								{#if mv.selected}
+									<Button class="btn m-1 w-24 bg-red-400" onclick={moveMarker}>Verschieben</Button>
+									<Button class="btn m-1 w-24 bg-red-400" onclick={editMarker}>Details</Button>
+									<Button class="btn m-1 w-24 bg-red-400" onclick={deleteMarker}>Löschen</Button>
+									<Button class="btn m-1 w-24 bg-red-400" onclick={toggleMarker}>Kontrolle</Button>
+								{/if}
+							</Popup>
+						{/key}
+					</Marker>
+				{/each}
+			</SVMap>
+		{/key}
 	</div>
 {/snippet}
 
@@ -365,7 +383,7 @@
 		<SidebarGroup border={false}>
 			<SidebarItem label="Neues Zentrum" onclick={updDefaultCenter}></SidebarItem>
 			<SidebarItem label="Zum Zentrum" onclick={() => centerMap(defaultCenter)}></SidebarItem>
-			<SidebarItem label="Kanban" {spanClass} href="/"></SidebarItem>
+			<SidebarItem label="Nabu-Import" href="/nabuimport"></SidebarItem>
 			<SidebarItem label="Inbox" {spanClass} href="/"></SidebarItem>
 			<SidebarItem label="Sidebar" href="/components/sidebar"></SidebarItem>
 		</SidebarGroup>

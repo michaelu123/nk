@@ -29,6 +29,7 @@ export const load: LayoutLoad = async ({ data, url }) => {
 							const db = ev.target.result;
 							db.createObjectStore('settings');
 							db.createObjectStore('nk');
+							db.createObjectStore('kontrollen');
 						};
 						request.onsuccess = () => resolve(request.result);
 						request.onerror = () => reject(request.error);
@@ -48,6 +49,7 @@ export const load: LayoutLoad = async ({ data, url }) => {
 					upgrade(db) {
 						db.createObjectStore('settings');
 						db.createObjectStore('nk');
+						db.createObjectStore('kontrollen');
 					}
 				});
 				console.log('indexeddb is persistent');

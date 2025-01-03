@@ -1,8 +1,9 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import ProposedInput from '$lib/components/ProposedInput.svelte';
 	import { getState } from '$lib/state.svelte';
 	import { redirect } from '@sveltejs/kit';
-	import { Textarea, Label, Button, Input, Select } from 'svelte-5-ui-lib';
+	import { Textarea, Label, Button, Input, Card } from 'svelte-5-ui-lib';
 
 	let nkState = getState();
 	let { nkTypes } = $derived(nkState);
@@ -15,7 +16,7 @@
 	console.log('page id', data.id);
 	let { markerValues } = nkState;
 	let mv = $derived(markerValues.find((m) => m.dbFields.id == id));
-	let isEditMode = $state(true);
+	let isEditMode = $state(false);
 
 	let name = $state('');
 	let nkType = $state('');
@@ -38,71 +39,72 @@
 
 	async function toggleEditModeAndSaveToDatabase() {
 		if (isEditMode && mv) {
+			console.log('comment1', comment);
 			await nkState.persist(mv, { name, nkType, comment });
 			await nkState.updNkTypes(nkType);
 		}
 		isEditMode = !isEditMode;
 	}
 
-	let nkTypeList: string[] = $derived.by(() => {
-		let keys = nkTypes.keys().toArray();
-		let uc = nkType.toUpperCase();
-		keys = keys.filter((k) => k.toUpperCase().includes(uc));
-		keys = keys.toSorted((b, a) => nkTypes.get(a)! - nkTypes.get(b)!);
-		keys = keys.slice(0, 8);
-		return keys;
-	});
+	async function takephoto() {
+		console.log('takephoto');
+	}
 </script>
 
 {#if mv}
-	<h1 class="mt-8 text-center text-2xl font-semibold">Nistkasten</h1>
+	<h1 class="my-8 text-center text-2xl font-semibold">Nistkasten</h1>
+	<div class="m-1 flex items-center justify-center">
+		{#if mv.dbFields.image || mv.dbFields.name.includes('e')}
+			<img src="$lib/assets/rewards-header-image-witcher3@2x.webp" alt="" />
+		{:else}
+			<button onclick={takephoto}>
+				<img src="$lib/assets/photo-camera-svgrepo-com.svg" alt="" />
+			</button>
+		{/if}
+	</div>
+
 	{#if isEditMode}
 		<form class="m-4 flex flex-col items-baseline gap-4">
-			<div class="flex flex-row">
+			<div class="flex w-full flex-row">
 				<Label class="w-40" for="name_id">Name:</Label>
 				<Input type="text" id="name_id" name="name" class="input" bind:value={name} />
 			</div>
-			<div class="flex flex-row">
-				<Label class="w-40" for="nktype_id">Typ:</Label>
-				<Input list="nktypelist" id="nktype_id" name="nktype" type="text" bind:value={nkType} />
-				<datalist id="nktypelist">
-					{#each nkTypeList as nkt}
-						<option value={nkt}></option>
-					{/each}
-				</datalist>
-			</div>
-			<!-- datalist does currently not work on Android Chrome! -->
+			<ProposedInput itemMap={nkTypes} bind:value={nkType} />
 			<div class="flex w-full flex-row">
-				<Label class="w-40" for="nktype_select">Vordef:</Label>
-				<Select class="mr-1" name="nktypeA" id="nktype-select" bind:value={nkType}>
-					{#each nkTypeList as nkt}
-						<option value={nkt}>{nkt}</option>
-					{/each}
-				</Select>
-			</div>
-			<div class="flex flex-row">
 				<Label class="w-40" for="comment_id">Bemerkungen</Label>
-				<Textarea name="comment" id="comment_id" bind:value={comment}></Textarea>
+				<Textarea name="comment" id="comment_id" bind:value={comment} rows={5}></Textarea>
 			</div>
 		</form>
 	{:else}
-		<h2>Name {name}</h2>
-		<h2>Art {nkType}</h2>
-		<h2>Kommentar {comment}</h2>
+		<Card size="xl">
+			<div class="mb-4 flex">
+				<p class="w-40 font-bold">Name</p>
+				<p>{name}</p>
+			</div>
+			<div class="mb-4 flex">
+				<p class="w-40 font-bold">Typ</p>
+				<p>{nkType}</p>
+			</div>
+			<div class="mb-4 flex">
+				<p class="w-40 font-bold">Zuletzt geputzt</p>
+				<p>
+					{mv.dbFields.lastCleaned ? new Date(mv.dbFields.lastCleaned!).toLocaleDateString() : ''}
+				</p>
+			</div>
+			<div class="mb-4 flex">
+				<p class="w-40 font-bold">Kommentar</p>
+				<Textarea name="comment" id="comment_id" value={comment} readonly rows={5}></Textarea>
+			</div>
+		</Card>
 	{/if}
-	<h2>Zuletzt {mv.dbFields.lastCleaned}</h2>
 
-	<Button onclick={toggleEditModeAndSaveToDatabase}>{isEditMode ? 'Save' : 'Edit'}</Button>
-	<a href="/nk/one">ONE</a>
-	<a href="/nk/two">TWO</a>
-	<a href="/nk/three">THREE</a>
-	<a href="/nk/four">FOUR</a>
-	<Button onclick={() => goto('/nk/one')}>BONE</Button>
-	<Button onclick={() => goto('/nk/two')}>BTWO</Button>
-	<Button onclick={() => goto('/nk/three')}>BTHREE</Button>
-	<Button onclick={() => goto('/nk/four')}>BFOUR</Button>
-	<Button onclick={goBack}>Back</Button>
-	<Button onclick={goMap}>Map</Button>
+	<div class="mb-4 mr-4 mt-6 text-right">
+		{#if isEditMode}
+			<Button onclick={toggleEditModeAndSaveToDatabase}>Speichern</Button>
+			<Button onclick={() => (isEditMode = false)}>Nicht speichern</Button>
+		{:else}
+			<Button onclick={toggleEditModeAndSaveToDatabase}>Ändern</Button>
+		{/if}
+		<Button onclick={goMap}>Karte</Button>
+	</div>
 {/if}
-
-<h2>{nkType}</h2>
