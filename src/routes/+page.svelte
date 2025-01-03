@@ -231,7 +231,6 @@
 	let geoloc = $state(false);
 
 	function posSucc(pos: any) {
-		console.log('posSucc', pos);
 		const crd = pos.coords;
 		currPos = [crd.latitude, crd.longitude];
 		// posTime = pos.timestamp;

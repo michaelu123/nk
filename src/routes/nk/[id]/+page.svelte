@@ -17,7 +17,6 @@
 	let { markerValues } = nkState;
 	let mv = $derived(markerValues.find((m) => m.dbFields.id == id));
 	let isEditMode = $state(false);
-
 	let name = $state('');
 	let nkType = $state('');
 	let comment = $state('');
@@ -46,7 +45,7 @@
 		isEditMode = !isEditMode;
 	}
 
-	async function takephoto() {
+	async function takePhoto() {
 		console.log('takephoto');
 	}
 </script>
@@ -54,11 +53,11 @@
 {#if mv}
 	<h1 class="my-8 text-center text-2xl font-semibold">Nistkasten</h1>
 	<div class="m-1 flex items-center justify-center">
-		{#if mv.dbFields.image || mv.dbFields.name.includes('e')}
-			<img src="$lib/assets/rewards-header-image-witcher3@2x.webp" alt="" />
+		{#if mv.dbFields.image || mv.dbFields.name.includes('2')}
+			<img src="/src/lib/assets/rewards-header-image-witcher3@2x.webp" alt="" />
 		{:else}
-			<button onclick={takephoto}>
-				<img src="$lib/assets/photo-camera-svgrepo-com.svg" alt="" />
+			<button onclick={takePhoto}>
+				<img src="/src/lib/assets/photo-camera-svgrepo-com.svg" alt="" />
 			</button>
 		{/if}
 	</div>
@@ -95,16 +94,23 @@
 				<p class="w-40 font-bold">Kommentar</p>
 				<Textarea name="comment" id="comment_id" value={comment} readonly rows={5}></Textarea>
 			</div>
+			{#each mv.ctrls ?? [] as ctrl}
+				<p>Date {ctrl.date.toLocaleDateString()}</p>
+				<p>Art {ctrl.species}</p>
+				<p>Beschreibung {ctrl.comment}</p>
+				<p>Bild {ctrl.image}</p>
+			{/each}
 		</Card>
 	{/if}
 
-	<div class="mb-4 mr-4 mt-6 text-right">
+	<div class="mb-4 ml-4 mt-6 text-left">
 		{#if isEditMode}
 			<Button onclick={toggleEditModeAndSaveToDatabase}>Speichern</Button>
 			<Button onclick={() => (isEditMode = false)}>Nicht speichern</Button>
+			<Button onclick={takePhoto}>Neues Bild aufnehmen</Button>
 		{:else}
 			<Button onclick={toggleEditModeAndSaveToDatabase}>Ändern</Button>
 		{/if}
-		<Button onclick={goMap}>Karte</Button>
+		<Button onclick={goMap}>Zurück zur Karte</Button>
 	</div>
 {/if}

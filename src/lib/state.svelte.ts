@@ -16,7 +16,7 @@ export interface MarkerProps {
 export interface MarkerEntry {
 	latLng: number[];
 	mrk: any | null;
-	ctrls: ControlEntry[];
+	ctrls: ControlEntry[] | null;
 	selected: boolean;
 	color: 'green' | 'red';
 	dbFields: MarkerProps;
@@ -153,7 +153,7 @@ export class State implements StateProps {
 			this.markerValues.push(mv);
 			this.updNkTypes(mv.dbFields.nkType);
 		}
-		console.log('fetch nktypes', this.nkTypes);
+		console.log('fetch nktypes', this.nkTypes, 'mvlen', this.markerValues.length);
 	}
 
 	async fetchCenterData() {
@@ -203,19 +203,28 @@ export class State implements StateProps {
 		for (let key of keys) {
 			const val = this.idb ? await this.idb.get('kontrollen', key) : localStorage.getItem(key);
 			const ctrl = JSON.parse(val) as ControlEntry;
+			ctrl.date = new Date(ctrl.date);
 			let mv = markerMap.get(ctrl.nkid);
 			if (mv) {
 				if (!mv.ctrls) mv.ctrls = [];
 				mv.ctrls.push(ctrl);
+				if (!mv.dbFields.lastCleaned || ctrl.date > mv.dbFields.lastCleaned) {
+					mv.dbFields.lastCleaned = ctrl.date;
+				}
 			} else {
-				console.log('no marker for control ' + ctrl);
+				console.log('no marker for control ' + JSON.stringify(ctrl));
+			}
+		}
+		for (let mv of this.markerValues) {
+			if (mv.ctrls && mv.ctrls.length > 0) {
+				mv.ctrls = mv.ctrls.toSorted((b, a) => a.date.valueOf() - b.date.valueOf());
 			}
 		}
 	}
 
 	addMarker(ll: any): string {
 		const today = new Date();
-		const id = today.getUTCMilliseconds().toString();
+		const id = today.valueOf().toString();
 		this.markerValues.push({
 			latLng: [ll.lat, ll.lng],
 			mrk: null,
@@ -224,8 +233,8 @@ export class State implements StateProps {
 			color: 'green',
 			dbFields: {
 				id,
-				name: 'unbekannt',
-				nkType: 'unbekannt',
+				name: '',
+				nkType: '',
 				comment: '',
 				image: null,
 				lastCleaned: today,
@@ -233,17 +242,26 @@ export class State implements StateProps {
 				changedAt: null
 			}
 		});
+		console.log('addMarker mvlen', this.markerValues.length);
 		return id;
 	}
 
 	async deleteMarker(index: number) {
 		if (index == -1) return;
-		const id = this.markerValues[index].dbFields.id;
+		const mv = this.markerValues[index];
+		const id = mv.dbFields.id;
 		this.markerValues.splice(index, 1);
 		if (this.idb) {
 			await this.idb!.delete('nk', id);
 		} else {
 			localStorage.removeItem(id);
+		}
+		for (const ctrl of mv.ctrls ?? []) {
+			if (this.idb) {
+				await this.idb!.delete('kontrollen', ctrl.id);
+			} else {
+				localStorage.removeItem(ctrl.id);
+			}
 		}
 	}
 

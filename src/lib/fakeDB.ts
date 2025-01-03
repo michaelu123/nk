@@ -7,6 +7,7 @@ export let markerVals: MarkerEntry[] = [
 	{
 		latLng: [mucLat + 0.001, mucLng + 0.001],
 		mrk: null,
+		ctrls: null,
 		selected: false,
 		dbFields: {
 			id: 'one',
@@ -23,6 +24,7 @@ export let markerVals: MarkerEntry[] = [
 	{
 		latLng: [mucLat - 0.001, mucLng + 0.001],
 		mrk: null,
+		ctrls: null,
 		selected: false,
 		dbFields: {
 			id: 'two',
@@ -39,6 +41,7 @@ export let markerVals: MarkerEntry[] = [
 	{
 		latLng: [mucLat + 0.001, mucLng - 0.001],
 		mrk: null,
+		ctrls: null,
 		selected: false,
 		dbFields: {
 			id: 'three',
@@ -55,6 +58,7 @@ export let markerVals: MarkerEntry[] = [
 	{
 		latLng: [mucLat - 0.001, mucLng - 0.001],
 		mrk: null,
+		ctrls: null,
 		selected: false,
 		dbFields: {
 			id: 'four',

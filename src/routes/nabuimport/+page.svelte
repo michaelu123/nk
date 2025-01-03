@@ -76,7 +76,7 @@
 		const today = new Date();
 		for (const r of records.slice(1)) {
 			const id = r[idIndex].toString(); // keep id, as good as any
-			const name = r[nameIndex];
+			const name = r[nameIndex].toString();
 			const typ = r[typIndex];
 			const comment = r[commentIndex];
 			const lat = parseFloat(r[latIndex].replace(',', '.')); // TODO: check if within bounds
@@ -127,29 +127,50 @@
 		// const hinweiseIndex = headers.findIndex((h) => h === 'Hinweise / Spuren / Erfassungstyp');
 
 		const today = new Date();
+		const ctrlMap: Map<string, ControlEntry> = new Map();
+
 		let nowId = Date.now();
 		for (const r of records.slice(1)) {
-			const id = (nowId++).toString();
+			const id = '';
 			const nkid = r[idIndex].toString();
-			const name = r[nameIndex];
+			const name = r[nameIndex].toString();
 			const datum = r[datumIndex]; // 27.12.2024
 			const date = datum2Date(datum);
 			const species = r[artIndex];
 			const comment = r[bemerkungIndex];
-			const ctrl: ControlEntry = {
-				id,
-				nkid,
-				name,
-				date,
-				species,
-				comment,
-				image: null,
-				createdAt: today,
-				changedAt: null
-			};
+
+			// make one entry from these lines
+			// 7913;9;16.12.2023;Nisthilfe allgemein;;;;gereinigt;;Michael Uhlenberg;
+			// 7913;9;16.12.2023;Blaumeise;;;;;;Michael Uhlenberg;
+			const key = nkid + datum;
+			let ctrl = ctrlMap.get(key);
+			if (!ctrl) {
+				ctrl = {
+					id,
+					nkid,
+					name,
+					date,
+					species,
+					comment,
+					image: null,
+					createdAt: today,
+					changedAt: null
+				};
+				ctrlMap.set(key, ctrl);
+			} else if (species != 'Nisthilfe allgemein') {
+				ctrl.species = species;
+				ctrl.comment = comment;
+			}
+		}
+		for (const ctrl of ctrlMap.values()) {
+			ctrl.id = (nowId++).toString();
+			if (ctrl.species == 'Nisthilfe allgemein') {
+				ctrl.species = '';
+			}
 			await nkState.importCtrl(ctrl);
 			cnt++;
 		}
+		await nkState.fetchUserData();
 	}
 </script>
 
@@ -185,8 +206,8 @@
 			</div>
 		</div>
 	{/if}
-	<div class="text-right">
-		<Button class="mt-4 text-right" onclick={() => goto('/')}>Karte</Button>
+	<div class="text-left">
+		<Button class="mr-4 mt-4" onclick={() => goto('/')}>Karte</Button>
 	</div>
 </div>
 
