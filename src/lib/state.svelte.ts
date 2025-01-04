@@ -65,6 +65,7 @@ export class State implements StateProps {
 	bucket: any | null = null;
 
 	defaultCenter = $state([mucLat, mucLng]);
+	defaultZoom = $state(16);
 	markerValues = $state<MarkerEntry[]>([]);
 	maxBounds = $state([
 		[48.21736966757146, 11.411914216629935],
@@ -88,7 +89,14 @@ export class State implements StateProps {
 		const len = localStorage.length;
 		for (let i = 0; i < len; i++) {
 			const k = localStorage.key(i);
-			if (k && nk != k.startsWith('_k_')) res.push(k);
+			if (k) {
+				if (nk) {
+					if (k.startsWith('_')) continue;
+				} else {
+					if (!k.startsWith('_k_')) continue;
+				}
+				res.push(k);
+			}
 		}
 		return res;
 	}
@@ -215,9 +223,13 @@ export class State implements StateProps {
 				console.log('no marker for control ' + JSON.stringify(ctrl));
 			}
 		}
+		let now = Date.now();
+		const MAX_DAYS = 100; // configurable?
+		const MAX_TIME_MS = MAX_DAYS * 24 * 60 * 60 * 1000;
 		for (let mv of this.markerValues) {
 			if (mv.ctrls && mv.ctrls.length > 0) {
 				mv.ctrls = mv.ctrls.toSorted((b, a) => a.date.valueOf() - b.date.valueOf());
+				mv.color = now - mv.ctrls[0].date.valueOf() < MAX_TIME_MS ? 'green' : 'red';
 			}
 		}
 	}
@@ -265,9 +277,10 @@ export class State implements StateProps {
 		}
 	}
 
-	async updDefaultCenter(center: number[]) {
+	async updDefaultCenter(center: number[], zoom: number) {
 		// this.defaultCenter = center; //  does not trigger state change!?
 		this.defaultCenter = center;
+		this.defaultZoom = zoom;
 		const js = JSON.stringify(this.defaultCenter);
 		console.log('upd js', js, 'center', center, 'dc', this.defaultCenter);
 		if (this.idb) {

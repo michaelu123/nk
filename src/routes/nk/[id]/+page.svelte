@@ -111,6 +111,6 @@
 		{:else}
 			<Button onclick={toggleEditModeAndSaveToDatabase}>Ändern</Button>
 		{/if}
-		<Button onclick={goMap}>Zurück zur Karte</Button>
+		<Button onclick={goBack}>Zurück zur Karte</Button>
 	</div>
 {/if}

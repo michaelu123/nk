@@ -4,7 +4,7 @@
 	import { getState } from '$lib/state.svelte';
 
 	let nkState = getState();
-	let { markerValues, maxBounds, defaultCenter } = $derived(nkState);
+	let { markerValues, maxBounds, defaultCenter, defaultZoom } = $derived(nkState);
 	let activeUrl = $state($page.url.pathname);
 	const spanClass = 'flex-1 ms-3 whitespace-nowrap';
 	const sidebarUi = uiHelpers();
@@ -38,7 +38,6 @@
 	let radius = $state(100);
 	// let posTime = $state(Date.now()); // TODO weg
 	// let nowTime = $state(Date.now());
-	let defaultZoom = 15;
 
 	// window.setInterval(() => (nowTime = Date.now()), 1000);
 
@@ -63,6 +62,7 @@
 	import selectedMarker from '$lib/assets/yellowMarker.svg';
 	import { goto } from '$app/navigation';
 	import { onMount, untrack } from 'svelte';
+	import { MapPinOutline } from 'flowbite-svelte-icons';
 	const selectedMarkerOptions = {
 		...commonIconOptions,
 		iconUrl: selectedMarker
@@ -74,6 +74,18 @@
 			// map.on('move', onMapMove);
 			// map.setMaxZoom(16);
 			// map.setMinZoom(14);
+			const scenter = sessionStorage.getItem('center');
+			const szoom = sessionStorage.getItem('zoom');
+			if (scenter && szoom) {
+				const center = JSON.parse(scenter);
+				const zoom = +szoom;
+				const options = { animate: false };
+				if (center && zoom) {
+					map.flyTo(center, zoom, options);
+				}
+				sessionStorage.removeItem('center');
+				sessionStorage.removeItem('zoom');
+			}
 			posStart();
 		}
 	});
@@ -195,9 +207,15 @@
 		console.log('to2', selectedMarkerIndex, centering);
 	}
 
+	function gotoID(id: string) {
+		sessionStorage.setItem('center', JSON.stringify(map.getCenter()));
+		sessionStorage.setItem('zoom', map.getZoom());
+		goto('/nk/' + id);
+	}
+
 	function addMarker() {
 		const id = nkState.addMarker(map.getCenter());
-		goto('/nk/' + id);
+		gotoID(id);
 	}
 	function editMarker() {
 		if (selectedMarkerIndex == -1) return;
@@ -205,7 +223,7 @@
 		const mv = markerValues[selectedMarkerIndex];
 		selectedMarkerIndex = -1;
 		mv.selected = false;
-		goto('/nk/' + mv.dbFields.id);
+		gotoID(mv.dbFields.id);
 	}
 
 	function deleteMarker() {
@@ -222,7 +240,7 @@
 	}
 
 	function updDefaultCenter() {
-		nkState.updDefaultCenter(map.getCenter());
+		nkState.updDefaultCenter(map.getCenter(), map.getZoom());
 		isSidebarOpen = false;
 	}
 
@@ -348,10 +366,10 @@
 							<Popup class="flex w-28 flex-col items-center">
 								{mv.dbFields.name}
 								{#if mv.selected}
-									<Button class="btn m-1 w-24 bg-red-400" onclick={moveMarker}>Verschieben</Button>
 									<Button class="btn m-1 w-24 bg-red-400" onclick={editMarker}>Details</Button>
-									<Button class="btn m-1 w-24 bg-red-400" onclick={deleteMarker}>Löschen</Button>
 									<Button class="btn m-1 w-24 bg-red-400" onclick={toggleMarker}>Kontrolle</Button>
+									<Button class="btn m-1 w-24 bg-red-400" onclick={moveMarker}>Verschieben</Button>
+									<Button class="btn m-1 w-24 bg-red-400" onclick={deleteMarker}>Löschen</Button>
 								{/if}
 							</Popup>
 						{/key}
