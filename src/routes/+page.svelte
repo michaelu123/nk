@@ -137,7 +137,7 @@
 			map.off('move', onMapMove);
 			centering = false;
 			const mv = markerValues[selectedMarkerIndex];
-			nkState.persist(mv, { latLng: mv.latLng });
+			nkState.persistNK(mv, { latLng: mv.latLng });
 		}
 		if (selectedMarkerIndex == -1) {
 			const mv = markerValues[index];

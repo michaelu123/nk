@@ -19,7 +19,7 @@
 
 <div class="w-full">
 	<div class="mb-4 flex flex-row">
-		<Label class="w-40" for="value_id">Typ:</Label>
+		<Label class="w-40 shrink-0" for="value_id">Typ:</Label>
 		<Input list="valuelist" id="value_id" name="value" type="text" bind:value />
 		<datalist id="valuelist">
 			{#each valueList as nkt}
@@ -29,7 +29,7 @@
 	</div>
 	<!-- datalist does currently not work on Android Chrome! -->
 	<div class="flex flex-row">
-		<Label class="w-40" for="value_select">Vordef:</Label>
+		<Label class="w-40 shrink-0" for="value_select">Vordef:</Label>
 		<Select class="" name="valueA" id="value-select" bind:value>
 			{#each valueList as nkt}
 				<option value={nkt}>{nkt}</option>

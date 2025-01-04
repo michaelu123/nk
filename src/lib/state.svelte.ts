@@ -44,6 +44,11 @@ export interface ControlEntry {
 	createdAt: Date;
 	changedAt: Date | null;
 }
+type UpdatableControlFields = {
+	species: string | null;
+	comment: string | null;
+	image: string | null;
+};
 
 export interface User {
 	id: string;
@@ -307,7 +312,7 @@ export class State implements StateProps {
 		}
 	}
 
-	async persist(mv: MarkerEntry, updateObject: Partial<UpdatableMarkerFields>) {
+	async persistNK(mv: MarkerEntry, updateObject: Partial<UpdatableMarkerFields>) {
 		for (const key of Object.keys(updateObject)) {
 			if (key == 'latLng') mv.latLng = updateObject.latLng!;
 			if (key == 'name') mv.dbFields.name = updateObject.name!;
@@ -316,6 +321,28 @@ export class State implements StateProps {
 		}
 		mv.dbFields.changedAt = new Date();
 		this.storeMv(mv);
+	}
+
+	async storeCtrl(ctrl: ControlEntry) {
+		const js = JSON.stringify(ctrl);
+		if (this.idb) {
+			try {
+				await this.idb.put('Kontrolle', js, ctrl.id);
+			} catch (e: any) {
+				console.log('err idb.put', e);
+			}
+		} else {
+			localStorage.setItem('_k_' + ctrl.id, js);
+		}
+	}
+
+	async persistCtrl(ctrl: ControlEntry, updateObject: Partial<UpdatableControlFields>) {
+		for (const key of Object.keys(updateObject)) {
+			if (key == 'species') ctrl.species = updateObject.species!;
+			if (key == 'comment') ctrl.comment = updateObject.comment!;
+		}
+		ctrl.changedAt = new Date();
+		this.storeCtrl(ctrl);
 	}
 
 	async updNkTypes(nkType: string) {
