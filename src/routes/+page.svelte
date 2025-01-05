@@ -39,6 +39,8 @@
 		mucLng = 11.576174072626772;
 	let currPos = $state([mucLat, mucLng]);
 	let radius = $state(100);
+	let followingGPS = $state(false);
+	let isGPSon = $state(false);
 	// let posTime = $state(Date.now()); // TODO weg
 	// let nowTime = $state(Date.now());
 
@@ -87,7 +89,7 @@
 				sessionStorage.removeItem('center');
 				sessionStorage.removeItem('zoom');
 			}
-			posStart();
+			// posStart(); // start watchPosition from user gesture!
 			timeoutId = window.setTimeout(markers, 100);
 		}
 	});
@@ -260,7 +262,6 @@
 	}
 
 	function centerMap(pos: number[]) {
-		console.log('centerMap', pos, 'dc', defaultCenter);
 		map.flyTo(pos, map.getZoom());
 		isSidebarOpen = false;
 	}
@@ -279,6 +280,7 @@
 		currPos = [crd.latitude, crd.longitude];
 		// posTime = pos.timestamp;
 		radius = pos.coords.accuracy / 2;
+		if (followingGPS) map.flyTo(currPos, map.getZoom());
 	}
 
 	function posErr(err: any) {
@@ -300,14 +302,32 @@
 	}
 
 	function posStart() {
-		if ('geolocation' in navigator) {
-			geoloc = true;
-			console.log('geolocation is available');
-			posRestart();
+		if (isGPSon) {
+			if (locid != -1) {
+				navigator.geolocation.clearWatch(locid);
+				locid = -1;
+			}
+			isGPSon = false;
 		} else {
-			geoloc = false;
-			console.log('geolocation is available');
+			if ('geolocation' in navigator) {
+				geoloc = true;
+				console.log('geolocation is available');
+				posRestart();
+			} else {
+				geoloc = false;
+				console.log('geolocation is available');
+			}
+			isGPSon = true;
 		}
+		isSidebarOpen = false;
+	}
+
+	function followGPS() {
+		followingGPS = !followingGPS;
+		if (followingGPS) {
+			map.flyTo(currPos, map.getZoom());
+		}
+		isSidebarOpen = false;
 	}
 </script>
 
@@ -418,7 +438,9 @@
 			<SidebarItem label="Neues Zentrum" onclick={updDefaultCenter}></SidebarItem>
 			<SidebarItem label="Zum Zentrum" onclick={() => centerMap(defaultCenter)}></SidebarItem>
 			<SidebarItem label="Nabu-Import" href="/nabuimport"></SidebarItem>
-			<SidebarItem label="Inbox" {spanClass} href="/"></SidebarItem>
+			<SidebarItem label={isGPSon ? 'GPS aus' : 'GPS ein'} onclick={posStart}></SidebarItem>
+			<SidebarItem label={followingGPS ? 'GPS nicht folgen' : 'GPS folgen'} onclick={followGPS}
+			></SidebarItem>
 			<SidebarItem label="Sidebar" href="/components/sidebar"></SidebarItem>
 		</SidebarGroup>
 		<SidebarGroup border={true}>
