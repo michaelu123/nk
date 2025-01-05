@@ -7,7 +7,7 @@
 	import { Textarea, Label, Button, Input, Card } from 'svelte-5-ui-lib';
 
 	let nkState = getState();
-	let { nkTypes } = $derived(nkState);
+	let { nkTypes, nkSpecies } = $derived(nkState);
 
 	let { data } = $props();
 	if (!data.id) {
@@ -74,9 +74,9 @@
 					<Label class="w-40 shrink-0" for="name_id">Name:</Label>
 					<Input type="text" id="name_id" name="name" class="input" bind:value={name} />
 				</div>
-				<ProposedInput itemMap={nkTypes} bind:value={nkType} />
+				<ProposedInput itemMap={nkTypes} bind:value={nkType} label="Typ" />
 				<div class="flex w-full flex-row">
-					<Label class="w-40 shrink-0" for="comment_id">Bemerkungen</Label>
+					<Label class="w-40 shrink-0" for="comment_id">Kommentar:</Label>
 					<Textarea name="comment" id="comment_id" bind:value={comment} rows={2}></Textarea>
 				</div>
 			</form>
@@ -118,7 +118,7 @@
 		{#if !isEditMode && mv.ctrls}
 			<h1 class="m-4 text-lg font-bold">Kontrollen:</h1>
 			{#each mv.ctrls ?? [] as ctrl (ctrl.id)}
-				<NKControl {mv} {ctrl} />
+				<NKControl {mv} {ctrl} {nkSpecies} />
 			{/each}
 		{/if}
 	</div>

@@ -1,5 +1,5 @@
 import { getContext, setContext } from 'svelte';
-import { markerVals, nkDefaultTypes } from './fakeDB';
+import { nkDefaultTypes, nkDefaultSpecies } from './fakeDB';
 import type { IDBPDatabase } from 'idb';
 
 export interface MarkerProps {
@@ -77,6 +77,7 @@ export class State implements StateProps {
 		[48.0478968379877, 11.702028367388204]
 	]);
 	nkTypes: Map<string, number> = $state(new Map());
+	nkSpecies: Map<string, number> = $state(new Map());
 
 	constructor(data: StateProps) {
 		this.updateState(data);
@@ -86,7 +87,7 @@ export class State implements StateProps {
 		this.user = data.user;
 		this.idb = data.idb;
 		this.bucket = data.bucket; // keep a ref to bucket, so that it does not close
-		this.fetchUserData();
+		this.fetchData();
 	}
 
 	getLocalStorageKeys(nk: boolean): string[] {
@@ -106,30 +107,36 @@ export class State implements StateProps {
 		return res;
 	}
 
-	async fetchNkTypesData() {
-		let nktypes: string[] = [];
-		const nval = this.idb
-			? await this.idb.get('settings', 'nktypes')
-			: localStorage.getItem('_nktypes');
-		if (nval) {
-			nktypes = JSON.parse(nval);
+	async fetchOccData(which: 'nktypes' | 'nkspecies') {
+		let occs: string[] = [];
+		const occval = this.idb
+			? await this.idb.get('settings', which)
+			: localStorage.getItem('_' + which);
+		if (occval) {
+			occs = JSON.parse(occval);
 		} else {
-			// seed nktypes
-			const nktypes = nkDefaultTypes;
-			const js = JSON.stringify(nktypes);
-			console.log('upd js', js, 'nktypes', this.nkTypes);
+			// seed occs
+			const occs = which == 'nktypes' ? nkDefaultTypes : nkDefaultSpecies;
+			const js = JSON.stringify(occs);
+			console.log('upd js', js, which);
 			if (this.idb) {
 				try {
-					await this.idb.put('settings', js, 'nktypes');
+					await this.idb.put('settings', js, which);
 				} catch (e: any) {
 					console.log('err idb.put', e);
 				}
 			} else {
-				localStorage.setItem('_nktypes', js);
+				localStorage.setItem('_' + which, js);
 			}
 		}
-		for (const nkt of nktypes) {
-			this.nkTypes.set(nkt, 0);
+		if (which == 'nktypes') {
+			for (const occ of occs) {
+				this.nkTypes.set(occ, 0);
+			}
+		} else {
+			for (const occ of occs) {
+				this.nkSpecies.set(occ, 0);
+			}
 		}
 	}
 
@@ -166,7 +173,6 @@ export class State implements StateProps {
 			this.markerValues.push(mv);
 			this.updNkTypes(mv.dbFields.nkType);
 		}
-		console.log('fetch nktypes', this.nkTypes, 'mvlen', this.markerValues.length);
 	}
 
 	async fetchCenterData() {
@@ -179,11 +185,14 @@ export class State implements StateProps {
 		}
 	}
 
-	async fetchUserData() {
-		await this.fetchNkTypesData();
+	async fetchData() {
+		await this.fetchOccData('nktypes');
+		await this.fetchOccData('nkspecies');
 		await this.fetchMarkersData();
 		await this.fetchCtrlsData();
 		await this.fetchCenterData();
+		console.log('nktypes', $state.snapshot(this.nkTypes));
+		console.log('nkspecs', $state.snapshot(this.nkSpecies));
 	}
 
 	importMV(mv: MarkerEntry) {
@@ -224,12 +233,13 @@ export class State implements StateProps {
 				if (!mv.dbFields.lastCleaned || ctrl.date > mv.dbFields.lastCleaned) {
 					mv.dbFields.lastCleaned = ctrl.date;
 				}
+				if (ctrl.species) this.updNkSpecies(ctrl.species);
 			} else {
 				console.log('no marker for control ' + JSON.stringify(ctrl));
 			}
 		}
 		let now = Date.now();
-		const MAX_DAYS = 100; // configurable?
+		const MAX_DAYS = 100; // TODO configurable?
 		const MAX_TIME_MS = MAX_DAYS * 24 * 60 * 60 * 1000;
 		for (let mv of this.markerValues) {
 			if (mv.ctrls && mv.ctrls.length > 0) {
@@ -345,13 +355,23 @@ export class State implements StateProps {
 		this.storeCtrl(ctrl);
 	}
 
-	async updNkTypes(nkType: string) {
+	updNkTypes(nkType: string) {
 		if (!nkType) return;
 		let count = this.nkTypes.get(nkType);
 		if (count) {
 			this.nkTypes.set(nkType, count + 1);
 		} else {
 			this.nkTypes.set(nkType, 1);
+		}
+	}
+
+	updNkSpecies(nkSpec: string) {
+		if (!nkSpec) return;
+		let count = this.nkSpecies.get(nkSpec);
+		if (count) {
+			this.nkSpecies.set(nkSpec, count + 1);
+		} else {
+			this.nkSpecies.set(nkSpec, 1);
 		}
 	}
 }

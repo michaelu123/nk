@@ -2,21 +2,23 @@
 	import type { ControlEntry, MarkerEntry } from '$lib/state.svelte';
 	import { Button, Label, Input, Textarea, Card } from 'svelte-5-ui-lib';
 	import { getState } from '$lib/state.svelte';
+	import ProposedInput from './ProposedInput.svelte';
 
 	interface Props {
 		ctrl: ControlEntry;
 		mv: MarkerEntry;
+		nkSpecies: Map<string, number>;
 	}
-	let { ctrl, mv }: Props = $props();
+	let { ctrl, mv, nkSpecies }: Props = $props();
 	let nkState = getState();
 
 	let isEditMode = $state(false);
-	let species = $state(ctrl.species);
+	let nkSpec = $state(ctrl.species ?? '');
 	let comment = $state(ctrl.comment);
 
 	async function toggleEditModeAndSaveToDatabase() {
 		if (isEditMode) {
-			await nkState.persistCtrl(ctrl, { species, comment });
+			await nkState.persistCtrl(ctrl, { species: nkSpec, comment });
 		}
 		isEditMode = !isEditMode;
 	}
@@ -43,10 +45,7 @@
 
 	{#if isEditMode}
 		<form class="m-4 flex flex-col items-baseline gap-4">
-			<div class="flex w-full flex-row">
-				<Label class="w-40 shrink-0" for="art_id">Art:</Label>
-				<Input type="text" id="art_id" name="art" class="input" bind:value={species!} />
-			</div>
+			<ProposedInput itemMap={nkSpecies} bind:value={nkSpec} label="Art" />
 			<div class="flex w-full flex-row">
 				<Label class="w-40 shrink-0" for="comment_id">Bemerkungen</Label>
 				<Textarea name="comment" id="comment_id" bind:value={comment!} rows={2}></Textarea>

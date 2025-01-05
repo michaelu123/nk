@@ -10,6 +10,22 @@
 	let errorMessage = $state('');
 	let cnt = $state(0);
 
+	const nabuMap: Map<string, string> = new Map([
+		['NiKa (Nistkasten)', 'Nistkasten'],
+		['HöKa FMaus HoBe (Höhlenkasten, Fledermaus, Holzbeton)', 'FL-Sommerkasten'],
+		['FlaKa FMaus HoBe B (Flachkasten, Fledermaus, Holzbeton, Baum)', 'Flachkasten'],
+		['WiQu FMaus HoBe (Winterquartier, Fledermaus, Holzbeton)', 'FL-Winterkasten'],
+		['FlaKa FMaus Ho B (Flachkasten, Fledermaus, Holz, Baum)', 'Flachkasten'],
+		['Nisthilfe allgemein', 'Leer'],
+		['Meise (alle)', 'Meise'],
+		['Kleiber, nordeuropäische Unterart', 'Kleiber'],
+		['Maus (alle)', 'Maus'],
+		['Europäische Hornisse', 'Hornisse']
+	]);
+	function nbmap(k: string) {
+		return nabuMap.get(k) || k;
+	}
+
 	export async function convertFileToText(file: File): Promise<string | null> {
 		return new Promise((resolve, reject) => {
 			const reader = new FileReader();
@@ -77,7 +93,7 @@
 		for (const r of records.slice(1)) {
 			const id = r[idIndex].toString(); // keep id, as good as any
 			const name = r[nameIndex].toString();
-			const typ = r[typIndex];
+			const typ = nbmap(r[typIndex]);
 			const comment = r[commentIndex];
 			const lat = parseFloat(r[latIndex].replace(',', '.')); // TODO: check if within bounds
 			const lng = parseFloat(r[lngIndex].replace(',', '.'));
@@ -136,7 +152,7 @@
 			const name = r[nameIndex].toString();
 			const datum = r[datumIndex]; // 27.12.2024
 			const date = datum2Date(datum);
-			const species = r[artIndex];
+			const species = nbmap(r[artIndex]);
 			const comment = r[bemerkungIndex];
 
 			// make one entry from these lines
@@ -170,7 +186,7 @@
 			await nkState.importCtrl(ctrl);
 			cnt++;
 		}
-		await nkState.fetchUserData();
+		await nkState.fetchData();
 	}
 </script>
 
