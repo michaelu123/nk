@@ -20,19 +20,24 @@
 	let name = $state('');
 	let nkType = $state('');
 	let comment = $state('');
+	let inited = $state(false);
 
+	// Another effect hack: mv appears eventually, and only then do I want to init name, nkType etc.
+	// when saving, I do not want this effect. So I call setStateBack in the effect only once...
 	$effect(() => {
-		if (mv) {
-			setState();
+		if (mv && !inited) {
+			setStateBack();
+			inited = true;
 		}
 	});
 
-	function setState() {
+	function setStateBack() {
 		name = mv!.dbFields.name;
 		nkType = mv!.dbFields.nkType;
 		comment = mv!.dbFields.comment;
 		isEditMode = false;
 	}
+
 	function goBack() {
 		history.back();
 	}
@@ -107,7 +112,7 @@
 		<div class="mb-4 ml-4 mt-6 text-left">
 			{#if isEditMode}
 				<Button class="m-1" onclick={toggleEditModeAndSaveToDatabase}>Speichern</Button>
-				<Button class="m-1" onclick={setState}>Nicht speichern</Button>
+				<Button class="m-1" onclick={setStateBack}>Nicht speichern</Button>
 				<Button class="m-1" onclick={takePhoto}>Neues Bild aufnehmen</Button>
 			{:else}
 				<Button class="m-1" onclick={toggleEditModeAndSaveToDatabase}>Ändern</Button>

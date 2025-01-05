@@ -78,6 +78,7 @@ export class State implements StateProps {
 	]);
 	nkTypes: Map<string, number> = $state(new Map());
 	nkSpecies: Map<string, number> = $state(new Map());
+	isLoading = $state(false);
 
 	constructor(data: StateProps) {
 		this.updateState(data);
@@ -186,18 +187,23 @@ export class State implements StateProps {
 	}
 
 	async fetchData() {
-		await this.fetchOccData('nktypes');
-		await this.fetchOccData('nkspecies');
-		await this.fetchMarkersData();
-		await this.fetchCtrlsData();
-		await this.fetchCenterData();
+		this.isLoading = true;
+		try {
+			await this.fetchOccData('nktypes');
+			await this.fetchOccData('nkspecies');
+			await this.fetchMarkersData();
+			await this.fetchCtrlsData();
+			await this.fetchCenterData();
+		} finally {
+			this.isLoading = false;
+		}
 		console.log('nktypes', $state.snapshot(this.nkTypes));
 		console.log('nkspecs', $state.snapshot(this.nkSpecies));
 	}
 
-	importMV(mv: MarkerEntry) {
+	async importMV(mv: MarkerEntry) {
 		this.markerValues.push(mv);
-		this.storeMv(mv);
+		await this.storeMv(mv);
 	}
 
 	async importCtrl(ctrl: ControlEntry) {
@@ -330,7 +336,7 @@ export class State implements StateProps {
 			if (key == 'comment') mv.dbFields.comment = updateObject.comment!;
 		}
 		mv.dbFields.changedAt = new Date();
-		this.storeMv(mv);
+		await this.storeMv(mv);
 	}
 
 	async storeCtrl(ctrl: ControlEntry) {

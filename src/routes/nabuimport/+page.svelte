@@ -20,7 +20,7 @@
 		['Meise (alle)', 'Meise'],
 		['Kleiber, nordeuropäische Unterart', 'Kleiber'],
 		['Maus (alle)', 'Maus'],
-		['Europäische Hornisse', 'Hornisse']
+		['Europäische Hornisse', 'Hornissen']
 	]);
 	function nbmap(k: string) {
 		return nabuMap.get(k) || k;
@@ -190,7 +190,7 @@
 	}
 </script>
 
-<div class="m-4">
+<div class="m-4 h-max w-max">
 	{#if cnt}
 		<h1>Es wurden {cnt} Einträge importiert</h1>
 	{:else}
@@ -198,7 +198,7 @@
 		<div class="upload-area">
 			<div class="upload-container">
 				{#if errorMessage}
-					<h4 class="mb-s upload-error text-center">
+					<h4 class="m-4 text-center text-red-500">
 						{errorMessage}
 					</h4>
 				{/if}
@@ -208,13 +208,7 @@
 						<p>CSV-Import wird verarbeitet</p>
 					</div>
 				{:else}
-					<Dropzone
-						on:drop={handleDrop}
-						multiple={false}
-						accept="text/csv"
-						maxSize={1000 * 1024}
-						containerClasses={'dropzone-import'}
-					>
+					<Dropzone on:drop={handleDrop} multiple={false} accept="text/csv" maxSize={1000 * 1024}>
 						<UploadOutline class="h-10 w-10" />
 						<p>Eine Datei hierher ziehen oder auswählen</p>
 					</Dropzone>
@@ -224,6 +218,9 @@
 	{/if}
 	<div class="text-left">
 		<Button class="mr-4 mt-4" onclick={() => goto('/')}>Karte</Button>
+		{#if cnt}
+			<Button class="mr-4 mt-4" onclick={() => (cnt = 0)}>Weiterer Import</Button>
+		{/if}
 	</div>
 </div>
 
@@ -250,16 +247,5 @@
 		100% {
 			transform: rotate(360deg);
 		}
-	}
-
-	:global(.dropzone-import) {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		justify-content: center;
-		min-width: 600px !important;
-		min-height: 400px !important;
-		flex: 0 !important;
-		cursor: pointer;
 	}
 </style>

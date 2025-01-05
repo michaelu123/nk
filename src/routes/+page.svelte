@@ -2,9 +2,12 @@
 	import { Sidebar, SidebarGroup, SidebarItem, SidebarButton, uiHelpers } from 'svelte-5-ui-lib';
 	import { page } from '$app/stores';
 	import { getState } from '$lib/state.svelte';
+	import { goto } from '$app/navigation';
 
 	let nkState = getState();
-	let { markerValues, maxBounds, defaultCenter, defaultZoom } = $derived(nkState);
+	let { markerValues, maxBounds, defaultCenter, defaultZoom, isLoading } = $derived(nkState);
+
+	// sidebar stuff
 	let activeUrl = $state($page.url.pathname);
 	const spanClass = 'flex-1 ms-3 whitespace-nowrap';
 	const sidebarUi = uiHelpers();
@@ -60,14 +63,12 @@
 	};
 
 	import selectedMarker from '$lib/assets/yellowMarker.svg';
-	import { goto } from '$app/navigation';
-	import { onMount, untrack } from 'svelte';
-	import { MapPinOutline } from 'flowbite-svelte-icons';
 	const selectedMarkerOptions = {
 		...commonIconOptions,
 		iconUrl: selectedMarker
 	};
 
+	let timeoutId: number = -1;
 	$effect(() => {
 		if (map) {
 			map.on('click', onMapClick);
@@ -87,17 +88,42 @@
 				sessionStorage.removeItem('zoom');
 			}
 			posStart();
+			timeoutId = window.setTimeout(markers, 100);
 		}
 	});
 
-	$effect(() => {
-		// console.log('effect markers');
-		markers();
-	});
+	// Cannot get this to work... with dependencies on markerValues  this effect is called a million times.
+	// It should be called only on changes of isLoading, but either it is called far too often,
+	// when markers() is not called from untrack, or not at all, when isLoading changes to false.
+
+	// $effect(() => {
+	// 	$inspect.trace('e3');
+	// 	console.log('3effect', isLoading);
+	// 	untrack(markers);
+	// });
 
 	const fctMap = new Map<string, any>();
 
+	// I need to set the markers.on() functions, after a) the markers were all loaded from the store,
+	// and b) the map has done the bind:instance to mv.mrk for all Sveaflet Markers.
+	// I don't know how else I can get access to the leaflet marker underlying the sveaflet Marker.
+
+	// Another problem: if I use setInterval, a clearInterval call instead of the clearTimeout does not work...
+	// Therefore a setTimeout sequence. Same for set/clearInterval without window. in front, seemingly a NodeJS.set/clearInterval.
 	function markers() {
+		if (isLoading) {
+			window.clearTimeout(timeoutId);
+			timeoutId = window.setTimeout(markers, 100);
+			return;
+		}
+		for (const mv of markerValues) {
+			if (!mv.mrk) {
+				window.clearTimeout(timeoutId);
+				timeoutId = window.setTimeout(markers, 100);
+				return;
+			}
+		}
+		window.clearTimeout(timeoutId);
 		for (const [index, mv] of markerValues.entries()) {
 			// console.log('setfct1', mv.dbFields.name, mv.mrk);
 			if (mv.mrk) {
@@ -283,14 +309,6 @@
 			console.log('geolocation is available');
 		}
 	}
-
-	function posNow() {
-		console.log('posNow');
-		navigator.geolocation.getCurrentPosition(posSucc, posErr);
-		for (let mv of markerValues) {
-			console.log('mv1', mv);
-		}
-	}
 </script>
 
 {#snippet header()}
@@ -300,13 +318,12 @@
 		<Button outline pill onclick={logmap}>?</Button>
 		<Button outline pill onclick={addMarker}>+</Button>
 		<Button outline pill onclick={() => centerMap(currPos)}>{'\u2316'}</Button>
-		<Button outline pill onclick={posNow}>{'>'}</Button>
 		<!--Button outline pill onclick={toggleDL}>{'\u263E\u263C'}</Button-->
 	</div>
 {/snippet}
 
 {#snippet svmap()}
-	<div style="width:100%;height:80vh;">
+	<div style="width:100%;height:100vh;">
 		{#key defaultCenter}
 			<SVMap
 				bind:instance={map}

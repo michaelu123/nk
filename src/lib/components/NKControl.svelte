@@ -14,13 +14,19 @@
 
 	let isEditMode = $state(false);
 	let nkSpec = $state(ctrl.species ?? '');
-	let comment = $state(ctrl.comment);
+	let comment = $state(ctrl.comment ?? '');
 
 	async function toggleEditModeAndSaveToDatabase() {
 		if (isEditMode) {
 			await nkState.persistCtrl(ctrl, { species: nkSpec, comment });
 		}
 		isEditMode = !isEditMode;
+	}
+
+	function setStateBack() {
+		nkSpec = ctrl.species ?? '';
+		comment = ctrl.comment ?? '';
+		isEditMode = false;
 	}
 </script>
 
@@ -33,10 +39,9 @@
 		<div class="w-full"></div>
 		{#if isEditMode}
 			<Button class="mr-2" onclick={toggleEditModeAndSaveToDatabase}>Speichern</Button>
-			<Button class="whitespace-nowrap" onclick={() => (isEditMode = false)}>Nicht speichern</Button
-			>
+			<Button class="mr-2 whitespace-nowrap" onclick={setStateBack}>Nicht speichern</Button>
 		{:else}
-			<Button onclick={toggleEditModeAndSaveToDatabase}>Ändern</Button>
+			<Button class="mr-2" onclick={toggleEditModeAndSaveToDatabase}>Ändern</Button>
 			{#if ctrl.image}
 				<Button onclick={() => {}}>Bild</Button>
 			{/if}
@@ -44,11 +49,11 @@
 	</div>
 
 	{#if isEditMode}
-		<form class="m-4 flex flex-col items-baseline gap-4">
+		<form class="my-4 flex flex-col items-baseline gap-4">
 			<ProposedInput itemMap={nkSpecies} bind:value={nkSpec} label="Art" />
 			<div class="flex w-full flex-row">
 				<Label class="w-40 shrink-0" for="comment_id">Bemerkungen</Label>
-				<Textarea name="comment" id="comment_id" bind:value={comment!} rows={2}></Textarea>
+				<Textarea name="comment" id="comment_id" bind:value={comment} rows={2}></Textarea>
 			</div>
 		</form>
 	{:else}
@@ -58,7 +63,7 @@
 		</div>
 		<div class="mb-4 flex">
 			<p class="w-40 shrink-0 font-bold">Beschreibung</p>
-			<Textarea name="comment" id="comment_id" value={comment!} readonly rows={2}></Textarea>
+			<Textarea name="comment" id="comment_id" value={comment} readonly rows={2}></Textarea>
 		</div>
 	{/if}
 </Card>

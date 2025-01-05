@@ -91,5 +91,7 @@ export let nkDefaultSpecies = [
 	'Kleiber',
 	'Siebenschläfer',
 	'Leer',
-	'Maus'
+	'Maus',
+	'Hornissen',
+	'Wespen'
 ];
