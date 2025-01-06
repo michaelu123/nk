@@ -1,7 +1,7 @@
 import type { PageLoad } from './$types';
 
-export const load: PageLoad = async ({ params }) => {
+export const load: PageLoad = async ({ params, url }) => {
 	const { id } = params;
 	console.log('ID', id);
-	return { id };
+	return { id, url };
 };
