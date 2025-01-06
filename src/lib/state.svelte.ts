@@ -141,7 +141,8 @@ export class State implements StateProps {
 		}
 	}
 
-	async fetchMarkersData() {
+	async fetchMarkersData(): Promise<MarkerEntry[]> {
+		const mvals: MarkerEntry[] = [];
 		let keys = this.idb
 			? (await this.idb.getAllKeys('nk')).map((k) => k.toString())
 			: this.getLocalStorageKeys(true);
@@ -171,9 +172,10 @@ export class State implements StateProps {
 		for (let key of keys) {
 			const val = this.idb ? await this.idb.get('nk', key) : localStorage.getItem(key);
 			const mv = JSON.parse(val) as MarkerEntry;
-			this.markerValues.push(mv);
+			mvals.push(mv);
 			this.updNkTypes(mv.dbFields.nkType);
 		}
+		return mvals;
 	}
 
 	async fetchCenterData() {
@@ -191,9 +193,10 @@ export class State implements StateProps {
 		try {
 			await this.fetchOccData('nktypes');
 			await this.fetchOccData('nkspecies');
-			await this.fetchMarkersData();
-			await this.fetchCtrlsData();
+			const mvals = await this.fetchMarkersData();
+			await this.fetchCtrlsData(mvals);
 			await this.fetchCenterData();
+			this.markerValues = mvals;
 		} finally {
 			this.isLoading = false;
 		}
@@ -219,9 +222,9 @@ export class State implements StateProps {
 		}
 	}
 
-	async fetchCtrlsData() {
+	async fetchCtrlsData(mvals: MarkerEntry[]) {
 		const markerMap: Map<string, MarkerEntry> = new Map();
-		for (let mv of this.markerValues) {
+		for (let mv of mvals) {
 			markerMap.set(mv.dbFields.id, mv);
 		}
 		let keys = this.idb
@@ -247,7 +250,7 @@ export class State implements StateProps {
 		let now = Date.now();
 		const MAX_DAYS = 100; // TODO configurable?
 		const MAX_TIME_MS = MAX_DAYS * 24 * 60 * 60 * 1000;
-		for (let mv of this.markerValues) {
+		for (let mv of mvals) {
 			if (mv.ctrls && mv.ctrls.length > 0) {
 				mv.ctrls = mv.ctrls.toSorted((b, a) => a.date.valueOf() - b.date.valueOf());
 				mv.color = now - mv.ctrls[0].date.valueOf() < MAX_TIME_MS ? 'green' : 'red';

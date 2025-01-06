@@ -11,7 +11,7 @@ export const load: LayoutLoad = async ({ data, url }) => {
 			// https://developer.chrome.com/blog/maximum-idb-performance-with-storage-buckets?hl=de
 			// https://lists.w3.org/Archives/Public/www-archive/2020Nov/att-0000/TPAC_2020_Storage_Buckets_API.pdf
 			// https://wicg.github.io/storage-buckets/explainer.html
-			console.log('using storageBuckets API');
+			console.log('using StorageBuckets API');
 			// the reference to bucket must NOT go away. Otherwise it seems to get garbage collected,
 			// and idb operations fail or don't return. Ultimately we save it in the State as context.
 			// any below: cannot find any storagebucket types. navigator.storagebuckets does not compile.
@@ -21,7 +21,7 @@ export const load: LayoutLoad = async ({ data, url }) => {
 			});
 
 			if (await bucket.persisted()) {
-				console.log('storageBucket is persisted');
+				console.log('StorageBuckets is persisted');
 				const idbUnwrapped: IDBRequest<IDBPDatabase<unknown> | null> = await new Promise(
 					(resolve, reject) => {
 						const request = bucket.indexedDB.open('NK');
@@ -38,7 +38,7 @@ export const load: LayoutLoad = async ({ data, url }) => {
 				const idb: IDBPDatabase | null = await wrap(idbUnwrapped);
 				return { bucket, idb, user };
 			} else {
-				console.log('storageBucket not persisted, use localstorage');
+				console.log('StorageBuckets not persisted, try IndexedDb');
 			}
 		}
 
@@ -52,7 +52,7 @@ export const load: LayoutLoad = async ({ data, url }) => {
 						db.createObjectStore('kontrollen');
 					}
 				});
-				console.log('indexeddb is persistent');
+				console.log('IndexedDb is persistent');
 				const persisted = await navigator.storage.persisted();
 				if (persisted) {
 					console.log('Storage will not be cleared except by explicit user action');
@@ -61,7 +61,7 @@ export const load: LayoutLoad = async ({ data, url }) => {
 				}
 				return { idb, user, bucket: null };
 			} else {
-				console.log('indexeddb is not persistent, use localStorage...');
+				console.log('IndexedDb is not persistent, must use LocalStorage...');
 				// if (url.pathname != '/notpersistent') redirect(302, '/notpersistent');
 			}
 		}
