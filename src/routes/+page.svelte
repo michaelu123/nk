@@ -235,15 +235,15 @@
 		console.log('to2', selectedMarkerIndex, centering);
 	}
 
-	function gotoID(id: string) {
+	async function gotoID(id: string) {
 		sessionStorage.setItem('center', JSON.stringify(map.getCenter()));
 		sessionStorage.setItem('zoom', map.getZoom());
-		goto('/nk/' + id);
+		await goto('/nk/' + id);
 	}
 
-	function addMarker() {
-		const id = nkState.addMarker(map.getCenter());
-		gotoID(id);
+	async function addMarker() {
+		const id = await nkState.addMarker(map.getCenter());
+		await gotoID(id + '?change');
 	}
 	function editMarker() {
 		if (selectedMarkerIndex == -1) return;

@@ -3,60 +3,68 @@
 	import ProposedInput from '$lib/components/ProposedInput.svelte';
 	import NKControl from '$lib/components/NKControl.svelte';
 	import { getState } from '$lib/state.svelte';
-	import { redirect } from '@sveltejs/kit';
+	import { error, redirect } from '@sveltejs/kit';
 	import { Textarea, Label, Button, Input, Card } from 'svelte-5-ui-lib';
 
 	let nkState = getState();
-	let { nkTypes, nkSpecies } = $derived(nkState);
-
+	let { nkTypes, nkSpecies, markerValues, isLoading } = $derived(nkState);
 	let { data } = $props();
 	if (!data.id) {
 		redirect(302, '/');
 	}
 	let id = $derived(data.id);
-	let { markerValues } = nkState;
 	let mv = $derived(markerValues.find((m) => m.dbFields.id == id));
-	let isEditMode = $state(false);
+	let isEditMode = $state(data.url.searchParams.toString().includes('change='));
 	let name = $state('');
 	let nkType = $state('');
 	let comment = $state('');
 	let inited = $state(false);
+	let errName = $state('');
+	let errType = $state('');
+	let image: string = $state('');
 
 	// Another effect hack: mv appears eventually, and only then do I want to init name, nkType etc.
 	// when saving, I do not want this effect. So I call setStateBack in the effect only once...
 	$effect(() => {
-		if (mv && !inited) {
+		console.log('1eff', nkState.mv2str(mv), inited);
+		if (mv && markerValues && !inited) {
 			setStateBack();
 			inited = true;
 		}
+		console.log('2eff', nkState.mv2str(mv), inited);
 	});
 
 	function setStateBack() {
 		name = mv!.dbFields.name;
 		nkType = mv!.dbFields.nkType;
 		comment = mv!.dbFields.comment;
-		isEditMode = false;
+		image = mv!.dbFields.image ?? '';
+		isEditMode = inited ? false : data.url.searchParams.toString().includes('change=');
 	}
 
 	function goBack() {
-		history.back();
-	}
-
-	function goMap() {
+		// history.back();
 		goto('/');
 	}
 
 	async function toggleEditModeAndSaveToDatabase() {
 		if (isEditMode && mv) {
-			console.log('comment1', comment);
-			await nkState.persistNK(mv, { name, nkType, comment });
-			await nkState.updNkTypes(nkType);
+			if (!name) errName = 'Bitte Namen vergeben';
+			if (!nkType) errType = 'Bitte Nistkastentyp vergeben';
+			if (!name || !nkType) return;
+			await nkState.persistNK(mv, { name, nkType, comment, image });
+			nkState.updNkTypes(nkType);
+			goBack();
 		}
 		isEditMode = !isEditMode;
 	}
 
 	async function takePhoto() {
+		if (!name) errName = 'Bitte Namen vergeben';
+		if (!nkType) errType = 'Bitte Nistkastentyp vergeben';
+		if (!name || !nkType) return;
 		console.log('takephoto');
+		image = 'xxx';
 	}
 </script>
 
@@ -79,7 +87,13 @@
 					<Label class="w-40 shrink-0" for="name_id">Name:</Label>
 					<Input type="text" id="name_id" name="name" class="input" bind:value={name} />
 				</div>
+				{#if errName}
+					<p class="w-full text-center text-red-500">{errName}</p>
+				{/if}
 				<ProposedInput itemMap={nkTypes} bind:value={nkType} label="Typ" />
+				{#if errType}
+					<p class="w-full text-center text-red-500">{errType}</p>
+				{/if}
 				<div class="flex w-full flex-row">
 					<Label class="w-40 shrink-0" for="comment_id">Kommentar:</Label>
 					<Textarea name="comment" id="comment_id" bind:value={comment} rows={2}></Textarea>
@@ -112,12 +126,15 @@
 		<div class="mb-4 ml-4 mt-6 text-left">
 			{#if isEditMode}
 				<Button class="m-1" onclick={toggleEditModeAndSaveToDatabase}>Speichern</Button>
-				<Button class="m-1" onclick={setStateBack}>Nicht speichern</Button>
-				<Button class="m-1" onclick={takePhoto}>Neues Bild aufnehmen</Button>
+				{#if mv.dbFields.name && mv.dbFields.nkType}
+					<Button class="m-1" onclick={setStateBack}>Nicht speichern</Button>
+					<Button class="m-1" onclick={goBack}>Zurück zur Karte</Button>
+					<Button class="m-1" onclick={takePhoto}>Neues Bild aufnehmen</Button>
+				{/if}
 			{:else}
 				<Button class="m-1" onclick={toggleEditModeAndSaveToDatabase}>Ändern</Button>
+				<Button class="m-1" onclick={goBack}>Zurück zur Karte</Button>
 			{/if}
-			<Button class="m-1" onclick={goBack}>Zurück zur Karte</Button>
 		</div>
 
 		{#if !isEditMode && mv.ctrls}
@@ -126,5 +143,13 @@
 				<NKControl {mv} {ctrl} {nkSpecies} />
 			{/each}
 		{/if}
+	</div>
+{:else if isLoading}
+	<div class="flex h-screen w-screen flex-col items-center justify-center gap-8">
+		<h1 class="text-4xl">Daten werden geladen</h1>
+	</div>
+{:else}
+	<div class="flex h-screen w-screen flex-col items-center justify-center gap-8">
+		<h1 class="text-4xl">Nicht gefunden</h1>
 	</div>
 {/if}

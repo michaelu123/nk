@@ -2,7 +2,7 @@
 	import CSV from '$lib/csv';
 	import { UploadOutline } from 'flowbite-svelte-icons';
 	import Dropzone from 'svelte-file-dropzone';
-	import { getState, type ControlEntry, type MarkerEntry } from '$lib/state.svelte';
+	import { getState, type ControlEntry, MarkerEntry } from '$lib/state.svelte';
 	import { goto } from '$app/navigation';
 	import { Button } from 'svelte-5-ui-lib';
 	let nkState = getState();
@@ -99,7 +99,7 @@
 			const lng = parseFloat(r[lngIndex].replace(',', '.'));
 			const abgehängt = r[abgehängtIndex];
 			if (abgehängt) continue;
-			const mv: MarkerEntry = {
+			const mv = new MarkerEntry({
 				latLng: [lat, lng],
 				mrk: null,
 				ctrls: [],
@@ -115,7 +115,7 @@
 					changedAt: null
 				},
 				color: 'green'
-			};
+			});
 			await nkState.importMV(mv);
 			cnt++;
 		}
