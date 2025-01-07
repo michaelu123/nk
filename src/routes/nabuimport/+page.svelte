@@ -21,7 +21,9 @@
 		['Maus (alle)', 'Maus'],
 		['Europäische Hornisse', 'Hornissen']
 	]);
+
 	function nbmap(k: string) {
+		if (k == 'Nisthilfe allgemein') return '';
 		return nabuMap.get(k) || k;
 	}
 
@@ -103,15 +105,13 @@
 				ctrls: [],
 				selected: false,
 				lastCleaned: null,
-				dbFields: {
-					id,
-					name,
-					nkType: typ,
-					comment,
-					image: null,
-					createdAt: today,
-					changedAt: null
-				},
+				id,
+				name,
+				nkType: typ,
+				comment,
+				image: null,
+				createdAt: today,
+				changedAt: null,
 				color: 'green'
 			});
 			await nkState.importMV(mv);
@@ -134,7 +134,7 @@
 		const artIndex = headers.findIndex((h) => h === 'Art');
 		const bemerkungIndex = headers.findIndex((h) => h === 'Bemerkung');
 
-		// const nestIndex = headers.findIndex((h) => h === 'Neststadium');
+		const nestIndex = headers.findIndex((h) => h === 'Neststadium');
 		// const erfasserIndex = headers.findIndex((h) => h === 'Erfasser');
 		const brutZeitCodeIndex = headers.findIndex((h) => h === 'Brutzeitcode');
 		// const anzahlIndex = headers.findIndex((h) => h === 'Anzahl');
@@ -153,7 +153,11 @@
 			const species = nbmap(r[artIndex]);
 			const comment = r[bemerkungIndex];
 			const cleaned = r[brutZeitCodeIndex] == 'gereinigt';
+			const nestStadium = r[nestIndex];
 
+			if (r[artIndex] == 'Nisthilfe allgemein') {
+				console.log('art', r);
+			}
 			// make one entry from these lines
 			// 7913;9;16.12.2023;Nisthilfe allgemein;;;;gereinigt;;Michael Uhlenberg;
 			// 7913;9;16.12.2023;Blaumeise;;;;;;Michael Uhlenberg;
@@ -174,9 +178,12 @@
 				};
 				ctrlMap.set(key, ctrl);
 			}
-			if (species != 'Nisthilfe allgemein') {
+			if (species) {
 				ctrl.species = species;
 				ctrl.comment = comment;
+			}
+			if (nestStadium && !ctrl.species && !species) {
+				ctrl.species = nestStadium;
 			}
 			if (cleaned) {
 				ctrl.cleaned = true;
@@ -184,9 +191,6 @@
 		}
 		for (const ctrl of ctrlMap.values()) {
 			ctrl.id = (nowId++).toString();
-			if (ctrl.species == 'Nisthilfe allgemein') {
-				ctrl.species = '';
-			}
 			await nkState.importCtrl(ctrl);
 			cnt++;
 		}

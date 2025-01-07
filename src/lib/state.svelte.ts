@@ -5,7 +5,13 @@ import type { IDBPDatabase } from 'idb';
 const MAX_DAYS = 100; // TODO configurable?
 const MAX_TIME_MS = MAX_DAYS * 24 * 60 * 60 * 1000;
 
-export interface DbFieldsProps {
+export interface MarkerEntryProps {
+	latLng: number[];
+	mrk: any | null;
+	ctrls: ControlEntry[] | null;
+	selected: boolean;
+	color: 'green' | 'red';
+	lastCleaned: Date | null;
 	id: string;
 	name: string;
 	nkType: string;
@@ -14,7 +20,13 @@ export interface DbFieldsProps {
 	createdAt: Date | null;
 	changedAt: Date | null;
 }
-export class DbFields implements DbFieldsProps {
+export class MarkerEntry implements MarkerEntryProps {
+	latLng: number[] = $state([]);
+	mrk: any = $state(null);
+	ctrls: ControlEntry[] | null = $state(null);
+	selected: boolean = $state(false);
+	color: 'green' | 'red' = $state('green');
+	lastCleaned: Date | null = $state(null);
 	id = '';
 	name = $state('');
 	nkType = $state('');
@@ -23,47 +35,6 @@ export class DbFields implements DbFieldsProps {
 	createdAt: Date | null = null;
 	changedAt: Date | null = null;
 
-	constructor(data: DbFieldsProps) {
-		this.updateDbFields(data);
-	}
-	updateDbFields(data: DbFieldsProps) {
-		this.id = data.id;
-		this.name = data.name;
-		this.nkType = data.nkType;
-		this.comment = data.comment;
-		this.image = data.image;
-		this.createdAt = data.createdAt;
-		this.changedAt = data.changedAt;
-	}
-}
-
-export interface MarkerEntryProps {
-	latLng: number[];
-	mrk: any | null;
-	ctrls: ControlEntry[] | null;
-	selected: boolean;
-	color: 'green' | 'red';
-	lastCleaned: Date | null;
-	dbFields: DbFieldsProps;
-}
-export class MarkerEntry implements MarkerEntryProps {
-	latLng: number[] = $state([]);
-	mrk: any = $state(null);
-	ctrls: ControlEntry[] | null = $state(null);
-	selected: boolean = $state(false);
-	color: 'green' | 'red' = $state('green');
-	lastCleaned: Date | null = $state(null);
-	dbFields: DbFields = $state(
-		new DbFields({
-			id: '',
-			name: '',
-			nkType: '',
-			comment: '',
-			image: null,
-			createdAt: null,
-			changedAt: null
-		})
-	);
 	constructor(data: MarkerEntryProps) {
 		this.updateMarkerEntry(data);
 	}
@@ -73,7 +44,13 @@ export class MarkerEntry implements MarkerEntryProps {
 		this.ctrls = data.ctrls;
 		this.selected = data.selected;
 		this.color = data.color;
-		this.dbFields = new DbFields(data.dbFields);
+		this.id = data.id;
+		this.name = data.name;
+		this.nkType = data.nkType;
+		this.comment = data.comment;
+		this.image = data.image;
+		this.createdAt = data.createdAt;
+		this.changedAt = data.changedAt;
 	}
 	toObj(): MarkerEntryProps {
 		let obj: MarkerEntryProps = {
@@ -83,15 +60,13 @@ export class MarkerEntry implements MarkerEntryProps {
 			selected: false,
 			color: 'green',
 			lastCleaned: this.lastCleaned,
-			dbFields: {
-				id: this.dbFields.id,
-				name: this.dbFields.name,
-				nkType: this.dbFields.nkType,
-				comment: this.dbFields.comment,
-				image: this.dbFields.image,
-				createdAt: this.dbFields.createdAt,
-				changedAt: this.dbFields.changedAt
-			}
+			id: this.id,
+			name: this.name,
+			nkType: this.nkType,
+			comment: this.comment,
+			image: this.image,
+			createdAt: this.createdAt,
+			changedAt: this.changedAt
 		};
 		return obj;
 	}
@@ -106,10 +81,6 @@ export class MarkerEntry implements MarkerEntryProps {
 			if (k == 'lastCleaned') return undefined;
 			return v;
 		});
-		// the code below sets js2 = undefined!??
-		// const js2 = JSON.stringify(obj, (k, v) => {
-		// 	return k == 'latLng' || k == 'dbFields' ? v : undefined;
-		// });
 		return js;
 	}
 
@@ -122,10 +93,7 @@ export class MarkerEntry implements MarkerEntryProps {
 		}
 	}
 }
-// type UpdatableMarkerFields = Omit<
-// 	MarkerEntry | MarkerProps,
-// 	'mrk' | 'selected' | 'color' | 'dbFields' | 'id'
-// >;
+
 type UpdatableMarkerFields = {
 	latLng: number[];
 	name: string;
@@ -259,9 +227,9 @@ export class State implements StateProps {
 		// 	for (let mv of markerVals) {
 		// 		const js = mv.mv2str();
 		// 		if (this.idb) {
-		// 			await this.idb.put('nk', js, mv.dbFields.id);
+		// 			await this.idb.put('nk', js, mv.id);
 		// 		} else {
-		// 			localStorage.setItem(mv.dbFields.id, js);
+		// 			localStorage.setItem(mv.id, js);
 		// 		}
 		// 	}
 		// 	keys = this.idb
@@ -273,7 +241,7 @@ export class State implements StateProps {
 			const val = this.idb ? await this.idb.get('nk', key) : localStorage.getItem(key);
 			const mv = new MarkerEntry(JSON.parse(val) as MarkerEntryProps);
 			mvals.push(mv);
-			this.updNkTypes(mv.dbFields.nkType);
+			this.updNkTypes(mv.nkType);
 		}
 		return mvals;
 	}
@@ -325,7 +293,7 @@ export class State implements StateProps {
 	async fetchCtrlsData(mvals: MarkerEntry[]) {
 		const markerMap: Map<string, MarkerEntry> = new Map();
 		for (let mv of mvals) {
-			markerMap.set(mv.dbFields.id, mv);
+			markerMap.set(mv.id, mv);
 		}
 		let keys = this.idb
 			? (await this.idb.getAllKeys('kontrollen')).map((k) => k.toString())
@@ -364,15 +332,13 @@ export class State implements StateProps {
 			selected: false,
 			color: 'green',
 			lastCleaned: null,
-			dbFields: {
-				id,
-				name: '',
-				nkType: '',
-				comment: '',
-				image: null,
-				createdAt: today,
-				changedAt: null
-			}
+			id,
+			name: '',
+			nkType: '',
+			comment: '',
+			image: null,
+			createdAt: today,
+			changedAt: null
 		});
 		console.log('addMarker mv', mv.mv2str());
 		this.markerValues.push(mv);
@@ -383,7 +349,7 @@ export class State implements StateProps {
 	async deleteMarker(index: number) {
 		if (index == -1) return;
 		const mv = this.markerValues[index];
-		const id = mv.dbFields.id;
+		const id = mv.id;
 		this.markerValues.splice(index, 1);
 		if (this.idb) {
 			await this.idb!.delete('nk', id);
@@ -416,24 +382,24 @@ export class State implements StateProps {
 		const js = mv.mv2str();
 		if (this.idb) {
 			try {
-				await this.idb.put('nk', js, mv.dbFields.id);
+				await this.idb.put('nk', js, mv.id);
 			} catch (e: any) {
 				console.log('err idb.put', e);
 			}
 		} else {
-			localStorage.setItem(mv.dbFields.id, js);
+			localStorage.setItem(mv.id, js);
 		}
 	}
 
 	async persistNK(mv: MarkerEntry, updateObject: Partial<UpdatableMarkerFields>) {
 		for (const key of Object.keys(updateObject)) {
 			if (key == 'latLng') mv.latLng = updateObject.latLng!;
-			if (key == 'name') mv.dbFields.name = updateObject.name!;
-			if (key == 'nkType') mv.dbFields.nkType = updateObject.nkType!;
-			if (key == 'image') mv.dbFields.image = updateObject.image!;
-			if (key == 'comment') mv.dbFields.comment = updateObject.comment!;
+			if (key == 'name') mv.name = updateObject.name!;
+			if (key == 'nkType') mv.nkType = updateObject.nkType!;
+			if (key == 'image') mv.image = updateObject.image!;
+			if (key == 'comment') mv.comment = updateObject.comment!;
 		}
-		mv.dbFields.changedAt = new Date();
+		mv.changedAt = new Date();
 		await this.storeMv(mv);
 	}
 

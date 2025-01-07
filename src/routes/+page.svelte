@@ -127,17 +127,17 @@
 		}
 		window.clearTimeout(timeoutId);
 		for (const [index, mv] of markerValues.entries()) {
-			// console.log('setfct1', mv.dbFields.name, mv.mrk);
+			// console.log('setfct1', mv.name, mv.mrk);
 			if (mv.mrk) {
 				const newfct = (e: any) => mclick(index, e);
-				const oldfct = fctMap.get(mv.dbFields.id);
+				const oldfct = fctMap.get(mv.id);
 				// console.log('setfct2', oldfct, newfct);
 				if (oldfct) {
 					mv.mrk.off('click', oldfct);
 				}
 				// mv.mrk.clearAllEventListeners(); or mv.mrk.off() does not have the same effect!?
 				mv.mrk.on('click', newfct);
-				fctMap.set(mv.dbFields.id, newfct);
+				fctMap.set(mv.id, newfct);
 			}
 		}
 	}
@@ -251,7 +251,7 @@
 		const mv = markerValues[selectedMarkerIndex];
 		selectedMarkerIndex = -1;
 		mv.selected = false;
-		gotoID(mv.dbFields.id);
+		gotoID(mv.id);
 	}
 
 	function deleteMarker() {
@@ -401,7 +401,7 @@
 										: greenMarkerOptions}
 							/>
 							<Popup class="flex w-28 flex-col items-center">
-								{mv.dbFields.name}
+								{mv.name}
 								{#if mv.selected}
 									<Button class="btn m-1 w-24 bg-red-400" onclick={editMarker}>Details</Button>
 									<Button class="btn m-1 w-24 bg-red-400" onclick={toggleMarker}>Kontrolle</Button>

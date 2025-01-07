@@ -13,7 +13,7 @@
 		redirect(302, '/');
 	}
 	let id = $derived(data.id);
-	let mv = $derived(markerValues.find((m) => m.dbFields.id == id));
+	let mv = $derived(markerValues.find((m) => m.id == id));
 	let isEditMode = $state(data.url.searchParams.toString().includes('change='));
 	let name = $state('');
 	let nkType = $state('');
@@ -24,7 +24,7 @@
 	let image: string = $state('');
 
 	// Another effect hack: mv appears eventually, and only then do I want to init name, nkType etc.
-	// when saving, I do not want this effect. So I call setStateBack in the effect only once...
+	// when saving, I do not want this effect. So I call setStateBack in the effect only once..
 	$effect(() => {
 		// console.log('1eff', mv ? mv.mv2str() : 'undef', inited);
 		if (mv && markerValues && !inited) {
@@ -35,10 +35,10 @@
 	});
 
 	function setStateBack() {
-		name = mv!.dbFields.name;
-		nkType = mv!.dbFields.nkType;
-		comment = mv!.dbFields.comment;
-		image = mv!.dbFields.image ?? '';
+		name = mv!.name;
+		nkType = mv!.nkType;
+		comment = mv!.comment;
+		image = mv!.image ?? '';
 		isEditMode = inited ? false : data.url.searchParams.toString().includes('change=');
 	}
 
@@ -72,7 +72,7 @@
 	<div id="details" class="overflow-x-clip">
 		<h1 class="my-8 text-center text-2xl font-semibold">Nistkasten</h1>
 		<div class="m-1 flex items-center justify-center">
-			{#if mv.dbFields.image || mv.dbFields.name.includes('2')}
+			{#if mv.image || mv.name.includes('2')}
 				<img src="/src/lib/assets/rewards-header-image-witcher3@2x.webp" alt="" />
 			{:else}
 				<button onclick={takePhoto}>
@@ -103,11 +103,11 @@
 			<Card class="m-4" size="xl">
 				<div class="mb-4 flex">
 					<p class="w-40 shrink-0 font-bold">Name</p>
-					<p>{mv.dbFields.name}</p>
+					<p>{mv.name}</p>
 				</div>
 				<div class="mb-4 flex">
 					<p class="w-40 shrink-0 font-bold">Typ</p>
-					<p>{mv.dbFields.nkType}</p>
+					<p>{mv.nkType}</p>
 				</div>
 				<div class="mb-4 flex">
 					<p class="w-40 shrink-0 font-bold">Zuletzt geputzt</p>
@@ -117,8 +117,7 @@
 				</div>
 				<div class="mb-4 flex">
 					<p class="w-40 shrink-0 font-bold">Kommentar</p>
-					<Textarea name="comment" id="comment_id" value={mv.dbFields.comment} readonly rows={2}
-					></Textarea>
+					<Textarea name="comment" id="comment_id" value={mv.comment} readonly rows={2}></Textarea>
 				</div>
 			</Card>
 		{/if}
@@ -126,7 +125,7 @@
 		<div class="mb-4 ml-4 mt-6 text-left">
 			{#if isEditMode}
 				<Button class="m-1" onclick={toggleEditModeAndSaveToDatabase}>Speichern</Button>
-				{#if mv.dbFields.name && mv.dbFields.nkType}
+				{#if mv.name && mv.nkType}
 					<Button class="m-1" onclick={setStateBack}>Nicht speichern</Button>
 					<Button class="m-1" onclick={goBack}>Zurück zur Karte</Button>
 					<Button class="m-1" onclick={takePhoto}>Neues Bild aufnehmen</Button>
