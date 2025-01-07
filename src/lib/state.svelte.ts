@@ -2,6 +2,9 @@ import { getContext, setContext } from 'svelte';
 import { nkDefaultTypes, nkDefaultSpecies } from './fakeDB';
 import type { IDBPDatabase } from 'idb';
 
+const MAX_DAYS = 100; // TODO configurable?
+const MAX_TIME_MS = MAX_DAYS * 24 * 60 * 60 * 1000;
+
 export interface DbFieldsProps {
 	id: string;
 	name: string;
@@ -108,6 +111,15 @@ export class MarkerEntry implements MarkerEntryProps {
 		// 	return k == 'latLng' || k == 'dbFields' ? v : undefined;
 		// });
 		return js;
+	}
+
+	setColor() {
+		let now = Date.now();
+		if (!this.lastCleaned) {
+			this.color = 'red';
+		} else {
+			this.color = now - this.lastCleaned.valueOf() < MAX_TIME_MS ? 'green' : 'red';
+		}
 	}
 }
 // type UpdatableMarkerFields = Omit<
@@ -326,7 +338,7 @@ export class State implements StateProps {
 			if (mv) {
 				if (!mv.ctrls) mv.ctrls = [];
 				mv.ctrls.push(ctrl);
-				if (!mv.lastCleaned || (ctrl.cleaned && ctrl.date > mv.lastCleaned)) {
+				if (ctrl.cleaned && (!mv.lastCleaned || ctrl.date > mv.lastCleaned)) {
 					mv.lastCleaned = ctrl.date;
 				}
 				if (ctrl.species) this.updNkSpecies(ctrl.species);
@@ -334,15 +346,8 @@ export class State implements StateProps {
 				console.log('no marker for control ' + JSON.stringify(ctrl));
 			}
 		}
-		let now = Date.now();
-		const MAX_DAYS = 100; // TODO configurable?
-		const MAX_TIME_MS = MAX_DAYS * 24 * 60 * 60 * 1000;
 		for (let mv of mvals) {
-			if (!mv.lastCleaned) {
-				mv.color = 'red';
-			} else {
-				mv.color = now - mv.lastCleaned.valueOf() < MAX_TIME_MS ? 'green' : 'red';
-			}
+			mv.setColor();
 			if (mv.ctrls && mv.ctrls.length > 0) {
 				mv.ctrls = mv.ctrls.toSorted((b, a) => a.date.valueOf() - b.date.valueOf());
 			}
@@ -445,13 +450,26 @@ export class State implements StateProps {
 		}
 	}
 
-	async persistCtrl(ctrl: ControlEntry, updateObject: Partial<UpdatableControlFields>) {
+	async persistCtrl(
+		mv: MarkerEntry,
+		ctrl: ControlEntry,
+		updateObject: Partial<UpdatableControlFields>
+	) {
 		for (const key of Object.keys(updateObject)) {
 			if (key == 'species') ctrl.species = updateObject.species!;
 			if (key == 'comment') ctrl.comment = updateObject.comment!;
+			if (key == 'cleaned') ctrl.cleaned = updateObject.cleaned!;
 		}
 		ctrl.changedAt = new Date();
-		this.storeCtrl(ctrl);
+		await this.storeCtrl(ctrl);
+
+		mv.lastCleaned = null;
+		for (let c of mv.ctrls!) {
+			if (c.cleaned && (!mv.lastCleaned || c.date > mv.lastCleaned)) {
+				mv.lastCleaned = c.date;
+			}
+		}
+		mv.setColor();
 	}
 
 	updNkTypes(nkType: string) {

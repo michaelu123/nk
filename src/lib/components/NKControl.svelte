@@ -19,7 +19,7 @@
 
 	async function toggleEditModeAndSaveToDatabase() {
 		if (isEditMode) {
-			await nkState.persistCtrl(ctrl, { species: nkSpec, comment, cleaned });
+			await nkState.persistCtrl(mv, ctrl, { species: nkSpec, comment, cleaned });
 		}
 		isEditMode = !isEditMode;
 	}
