@@ -8,7 +8,6 @@ export interface DbFieldsProps {
 	nkType: string;
 	comment: string;
 	image: string | null;
-	lastCleaned: Date | null;
 	createdAt: Date | null;
 	changedAt: Date | null;
 }
@@ -18,7 +17,6 @@ export class DbFields implements DbFieldsProps {
 	nkType = $state('');
 	comment = $state('');
 	image: string | null = $state(null);
-	lastCleaned: Date | null = null;
 	createdAt: Date | null = null;
 	changedAt: Date | null = null;
 
@@ -31,7 +29,6 @@ export class DbFields implements DbFieldsProps {
 		this.nkType = data.nkType;
 		this.comment = data.comment;
 		this.image = data.image;
-		this.lastCleaned = data.lastCleaned;
 		this.createdAt = data.createdAt;
 		this.changedAt = data.changedAt;
 	}
@@ -43,6 +40,7 @@ export interface MarkerEntryProps {
 	ctrls: ControlEntry[] | null;
 	selected: boolean;
 	color: 'green' | 'red';
+	lastCleaned: Date | null;
 	dbFields: DbFieldsProps;
 }
 export class MarkerEntry implements MarkerEntryProps {
@@ -51,6 +49,7 @@ export class MarkerEntry implements MarkerEntryProps {
 	ctrls: ControlEntry[] | null = $state(null);
 	selected: boolean = $state(false);
 	color: 'green' | 'red' = $state('green');
+	lastCleaned: Date | null = $state(null);
 	dbFields: DbFields = $state(
 		new DbFields({
 			id: '',
@@ -58,7 +57,6 @@ export class MarkerEntry implements MarkerEntryProps {
 			nkType: '',
 			comment: '',
 			image: null,
-			lastCleaned: null,
 			createdAt: null,
 			changedAt: null
 		})
@@ -81,26 +79,34 @@ export class MarkerEntry implements MarkerEntryProps {
 			ctrls: null,
 			selected: false,
 			color: 'green',
+			lastCleaned: this.lastCleaned,
 			dbFields: {
 				id: this.dbFields.id,
 				name: this.dbFields.name,
 				nkType: this.dbFields.nkType,
 				comment: this.dbFields.comment,
 				image: this.dbFields.image,
-				lastCleaned: this.dbFields.lastCleaned,
 				createdAt: this.dbFields.createdAt,
 				changedAt: this.dbFields.changedAt
 			}
 		};
 		return obj;
 	}
+
 	mv2str() {
 		const obj = this.toObj();
 		const js = JSON.stringify(obj, (k, v) => {
 			if (k == 'mrk') return undefined;
 			if (k == 'ctrls') return undefined;
+			if (k == 'selected') return undefined;
+			if (k == 'color') return undefined;
+			if (k == 'lastCleaned') return undefined;
 			return v;
 		});
+		// the code below sets js2 = undefined!??
+		// const js2 = JSON.stringify(obj, (k, v) => {
+		// 	return k == 'latLng' || k == 'dbFields' ? v : undefined;
+		// });
 		return js;
 	}
 }
@@ -124,6 +130,7 @@ export interface ControlEntry {
 	species: string | null;
 	comment: string | null;
 	image: string | null;
+	cleaned: boolean;
 	createdAt: Date;
 	changedAt: Date | null;
 }
@@ -131,6 +138,7 @@ type UpdatableControlFields = {
 	species: string | null;
 	comment: string | null;
 	image: string | null;
+	cleaned: boolean;
 };
 
 export interface User {
@@ -289,7 +297,6 @@ export class State implements StateProps {
 		this.markerValues.push(mv);
 		await this.storeMv(mv);
 	}
-
 	async importCtrl(ctrl: ControlEntry) {
 		const js = JSON.stringify(ctrl);
 		if (this.idb) {
@@ -311,7 +318,6 @@ export class State implements StateProps {
 		let keys = this.idb
 			? (await this.idb.getAllKeys('kontrollen')).map((k) => k.toString())
 			: this.getLocalStorageKeys(false);
-
 		for (let key of keys) {
 			const val = this.idb ? await this.idb.get('kontrollen', key) : localStorage.getItem(key);
 			const ctrl = JSON.parse(val) as ControlEntry;
@@ -320,8 +326,8 @@ export class State implements StateProps {
 			if (mv) {
 				if (!mv.ctrls) mv.ctrls = [];
 				mv.ctrls.push(ctrl);
-				if (!mv.dbFields.lastCleaned || ctrl.date > mv.dbFields.lastCleaned) {
-					mv.dbFields.lastCleaned = ctrl.date;
+				if (!mv.lastCleaned || (ctrl.cleaned && ctrl.date > mv.lastCleaned)) {
+					mv.lastCleaned = ctrl.date;
 				}
 				if (ctrl.species) this.updNkSpecies(ctrl.species);
 			} else {
@@ -332,9 +338,13 @@ export class State implements StateProps {
 		const MAX_DAYS = 100; // TODO configurable?
 		const MAX_TIME_MS = MAX_DAYS * 24 * 60 * 60 * 1000;
 		for (let mv of mvals) {
+			if (!mv.lastCleaned) {
+				mv.color = 'red';
+			} else {
+				mv.color = now - mv.lastCleaned.valueOf() < MAX_TIME_MS ? 'green' : 'red';
+			}
 			if (mv.ctrls && mv.ctrls.length > 0) {
 				mv.ctrls = mv.ctrls.toSorted((b, a) => a.date.valueOf() - b.date.valueOf());
-				mv.color = now - mv.ctrls[0].date.valueOf() < MAX_TIME_MS ? 'green' : 'red';
 			}
 		}
 	}
@@ -348,13 +358,13 @@ export class State implements StateProps {
 			ctrls: [],
 			selected: false,
 			color: 'green',
+			lastCleaned: null,
 			dbFields: {
 				id,
 				name: '',
 				nkType: '',
 				comment: '',
 				image: null,
-				lastCleaned: null,
 				createdAt: today,
 				changedAt: null
 			}
@@ -426,7 +436,7 @@ export class State implements StateProps {
 		const js = JSON.stringify(ctrl);
 		if (this.idb) {
 			try {
-				await this.idb.put('Kontrolle', js, ctrl.id);
+				await this.idb.put('kontrollen', js, ctrl.id);
 			} catch (e: any) {
 				console.log('err idb.put', e);
 			}

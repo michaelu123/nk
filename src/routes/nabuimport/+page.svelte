@@ -16,7 +16,6 @@
 		['FlaKa FMaus HoBe B (Flachkasten, Fledermaus, Holzbeton, Baum)', 'Flachkasten'],
 		['WiQu FMaus HoBe (Winterquartier, Fledermaus, Holzbeton)', 'FL-Winterkasten'],
 		['FlaKa FMaus Ho B (Flachkasten, Fledermaus, Holz, Baum)', 'Flachkasten'],
-		['Nisthilfe allgemein', 'Leer'],
 		['Meise (alle)', 'Meise'],
 		['Kleiber, nordeuropäische Unterart', 'Kleiber'],
 		['Maus (alle)', 'Maus'],
@@ -61,7 +60,6 @@
 				}
 				const dialect = { delimiter: ';' };
 				const records = (CSV as any).parse(str, dialect);
-				console.log('records', records);
 				if (records[0].length < 12) {
 					await importKontrollen(records);
 				} else {
@@ -104,13 +102,13 @@
 				mrk: null,
 				ctrls: [],
 				selected: false,
+				lastCleaned: null,
 				dbFields: {
 					id,
 					name,
 					nkType: typ,
 					comment,
 					image: null,
-					lastCleaned: null,
 					createdAt: today,
 					changedAt: null
 				},
@@ -138,7 +136,7 @@
 
 		// const nestIndex = headers.findIndex((h) => h === 'Neststadium');
 		// const erfasserIndex = headers.findIndex((h) => h === 'Erfasser');
-		// const brutZeitCodeIndex = headers.findIndex((h) => h === 'Brutzeitcode');
+		const brutZeitCodeIndex = headers.findIndex((h) => h === 'Brutzeitcode');
 		// const anzahlIndex = headers.findIndex((h) => h === 'Anzahl');
 		// const hinweiseIndex = headers.findIndex((h) => h === 'Hinweise / Spuren / Erfassungstyp');
 
@@ -154,6 +152,7 @@
 			const date = datum2Date(datum);
 			const species = nbmap(r[artIndex]);
 			const comment = r[bemerkungIndex];
+			const cleaned = r[brutZeitCodeIndex] == 'gereinigt';
 
 			// make one entry from these lines
 			// 7913;9;16.12.2023;Nisthilfe allgemein;;;;gereinigt;;Michael Uhlenberg;
@@ -168,14 +167,19 @@
 					date,
 					species,
 					comment,
+					cleaned,
 					image: null,
 					createdAt: today,
 					changedAt: null
 				};
 				ctrlMap.set(key, ctrl);
-			} else if (species != 'Nisthilfe allgemein') {
+			}
+			if (species != 'Nisthilfe allgemein') {
 				ctrl.species = species;
 				ctrl.comment = comment;
+			}
+			if (cleaned) {
+				ctrl.cleaned = true;
 			}
 		}
 		for (const ctrl of ctrlMap.values()) {

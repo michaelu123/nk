@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { ControlEntry, MarkerEntry } from '$lib/state.svelte';
-	import { Button, Label, Input, Textarea, Card } from 'svelte-5-ui-lib';
+	import { Button, Label, Input, Textarea, Card, Checkbox } from 'svelte-5-ui-lib';
 	import { getState } from '$lib/state.svelte';
 	import ProposedInput from './ProposedInput.svelte';
 
@@ -15,10 +15,11 @@
 	let isEditMode = $state(false);
 	let nkSpec = $state(ctrl.species ?? '');
 	let comment = $state(ctrl.comment ?? '');
+	let cleaned = $state(ctrl.cleaned);
 
 	async function toggleEditModeAndSaveToDatabase() {
 		if (isEditMode) {
-			await nkState.persistCtrl(ctrl, { species: nkSpec, comment });
+			await nkState.persistCtrl(ctrl, { species: nkSpec, comment, cleaned });
 		}
 		isEditMode = !isEditMode;
 	}
@@ -26,6 +27,7 @@
 	function setStateBack() {
 		nkSpec = ctrl.species ?? '';
 		comment = ctrl.comment ?? '';
+		cleaned = ctrl.cleaned;
 		isEditMode = false;
 	}
 </script>
@@ -36,6 +38,14 @@
 		<p>
 			{new Date(ctrl.date).toLocaleDateString()}
 		</p>
+		<p class="w-28 shrink-0 text-center font-bold">Gereinigt:</p>
+		{#if isEditMode}
+			<Checkbox bind:checked={cleaned} />
+		{:else if cleaned}
+			<Checkbox checked disabled classLabel="" />
+		{:else}
+			<Checkbox disabled classLabel="" />
+		{/if}
 		<div class="w-full"></div>
 		{#if isEditMode}
 			<Button class="mr-2" onclick={toggleEditModeAndSaveToDatabase}>Speichern</Button>
