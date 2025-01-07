@@ -6,12 +6,13 @@ import { openDB, type IDBPDatabase, wrap } from 'idb';
 export const load: LayoutLoad = async ({ data, url }) => {
 	console.log('+layout.ts', browser, url);
 	const { user } = data;
+	let useBucketsAnyways = true; // TODO configurable
+	let useIndexedDbAnyways = true; // TODO configurable
 	if (browser) {
 		if ('storageBuckets' in navigator) {
 			// https://developer.chrome.com/blog/maximum-idb-performance-with-storage-buckets?hl=de
 			// https://lists.w3.org/Archives/Public/www-archive/2020Nov/att-0000/TPAC_2020_Storage_Buckets_API.pdf
 			// https://wicg.github.io/storage-buckets/explainer.html
-			console.log('using StorageBuckets API');
 			// the reference to bucket must NOT go away. Otherwise it seems to get garbage collected,
 			// and idb operations fail or don't return. Ultimately we save it in the State as context.
 			// any below: cannot find any storagebucket types. navigator.storagebuckets does not compile.
@@ -19,9 +20,17 @@ export const load: LayoutLoad = async ({ data, url }) => {
 				durability: 'strict', // Or `'relaxed'`.
 				persisted: true // Or `false`.
 			});
-
-			if (await bucket.persisted()) {
+			let persisted = await bucket.persisted();
+			if (persisted) {
 				console.log('StorageBuckets is persisted');
+			} else {
+				console.log('StorageBuckets not persisted');
+				if (useBucketsAnyways) {
+					console.log('StorageBuckts used nevertheless');
+					persisted = true;
+				}
+			}
+			if (persisted) {
 				const idbUnwrapped: IDBRequest<IDBPDatabase<unknown> | null> = await new Promise(
 					(resolve, reject) => {
 						const request = bucket.indexedDB.open('NK');
@@ -38,12 +47,22 @@ export const load: LayoutLoad = async ({ data, url }) => {
 				const idb: IDBPDatabase | null = await wrap(idbUnwrapped);
 				return { bucket, idb, user };
 			} else {
-				console.log('StorageBuckets not persisted, try IndexedDb');
+				console.log('StorageBuckets not persisted and not used anyways, try IndexedDb');
 			}
 		}
+		if (navigator.storage) {
+			let persistent =
+				navigator.storage && navigator.storage.persist && (await navigator.storage.persist());
 
-		if (navigator.storage && navigator.storage.persist) {
-			const persistent = await navigator.storage.persist();
+			if (persistent) {
+				console.log('IndexedDb is persistent');
+			} else {
+				console.log('IndexedDb not persistent');
+				if (useIndexedDbAnyways) {
+					console.log('IndexedDb used nevertheless');
+					persistent = true;
+				}
+			}
 			if (persistent) {
 				let idb: IDBPDatabase | null = await openDB('NK', 1, {
 					upgrade(db) {
@@ -52,16 +71,16 @@ export const load: LayoutLoad = async ({ data, url }) => {
 						db.createObjectStore('kontrollen');
 					}
 				});
-				console.log('IndexedDb is persistent');
+				console.log('Using IndexedDb');
 				const persisted = await navigator.storage.persisted();
 				if (persisted) {
-					console.log('Storage will not be cleared except by explicit user action');
+					console.log('IndexedDb will not be cleared except by explicit user action');
 				} else {
-					console.log('Storage may be cleared by the UA under storage pressure.');
+					console.log('IndexedDb may be cleared by the UA under storage pressure.');
 				}
 				return { idb, user, bucket: null };
 			} else {
-				console.log('IndexedDb is not persistent, must use LocalStorage...');
+				console.log('IndexedDb is not persistent and not used anyways, must use LocalStorage...');
 				// if (url.pathname != '/notpersistent') redirect(302, '/notpersistent');
 			}
 		}

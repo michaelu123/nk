@@ -94,6 +94,15 @@ export class MarkerEntry implements MarkerEntryProps {
 		};
 		return obj;
 	}
+	mv2str() {
+		const obj = this.toObj();
+		const js = JSON.stringify(obj, (k, v) => {
+			if (k == 'mrk') return undefined;
+			if (k == 'ctrls') return undefined;
+			return v;
+		});
+		return js;
+	}
 }
 // type UpdatableMarkerFields = Omit<
 // 	MarkerEntry | MarkerProps,
@@ -228,7 +237,7 @@ export class State implements StateProps {
 		// seed Markers
 		// if (!oneSeen) {
 		// 	for (let mv of markerVals) {
-		// 		const js = this.mv2str(mv);
+		// 		const js = mv.mv2str();
 		// 		if (this.idb) {
 		// 			await this.idb.put('nk', js, mv.dbFields.id);
 		// 		} else {
@@ -350,7 +359,7 @@ export class State implements StateProps {
 				changedAt: null
 			}
 		});
-		console.log('addMarker mv', this.mv2str(mv));
+		console.log('addMarker mv', mv.mv2str());
 		this.markerValues.push(mv);
 		await this.persistNK(mv, {});
 		return id;
@@ -388,19 +397,8 @@ export class State implements StateProps {
 		}
 	}
 
-	mv2str(mv: MarkerEntry | null | undefined) {
-		if (!mv) return 'falsemv';
-		const obj = mv.toObj();
-		const js = JSON.stringify(obj, (k, v) => {
-			if (k == 'mrk') return undefined;
-			if (k == 'ctrls') return undefined;
-			return v;
-		});
-		return js;
-	}
-
 	async storeMv(mv: MarkerEntry) {
-		const js = this.mv2str(mv);
+		const js = mv.mv2str();
 		if (this.idb) {
 			try {
 				await this.idb.put('nk', js, mv.dbFields.id);

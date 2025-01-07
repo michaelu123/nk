@@ -26,12 +26,12 @@
 	// Another effect hack: mv appears eventually, and only then do I want to init name, nkType etc.
 	// when saving, I do not want this effect. So I call setStateBack in the effect only once...
 	$effect(() => {
-		console.log('1eff', nkState.mv2str(mv), inited);
+		console.log('1eff', mv ? mv.mv2str() : 'undef', inited);
 		if (mv && markerValues && !inited) {
 			setStateBack();
 			inited = true;
 		}
-		console.log('2eff', nkState.mv2str(mv), inited);
+		console.log('2eff', mv ? mv.mv2str() : 'undef', inited);
 	});
 
 	function setStateBack() {
