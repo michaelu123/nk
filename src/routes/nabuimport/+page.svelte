@@ -155,9 +155,6 @@
 			const cleaned = r[brutZeitCodeIndex] == 'gereinigt';
 			const nestStadium = r[nestIndex];
 
-			if (r[artIndex] == 'Nisthilfe allgemein') {
-				console.log('art', r);
-			}
 			// make one entry from these lines
 			// 7913;9;16.12.2023;Nisthilfe allgemein;;;;gereinigt;;Michael Uhlenberg;
 			// 7913;9;16.12.2023;Blaumeise;;;;;;Michael Uhlenberg;

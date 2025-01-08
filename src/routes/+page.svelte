@@ -225,33 +225,33 @@
 		console.log('mm2', selectedMarkerIndex, centering);
 	}
 
-	function toggleMarker() {
-		console.log('to1', selectedMarkerIndex, centering);
+	function addControlToMarker() {
+		console.log('addControlToMarker', selectedMarkerIndex, centering);
 		if (selectedMarkerIndex == -1) return;
 		const mv = markerValues[selectedMarkerIndex];
 		selectedMarkerIndex = -1;
 		mv.selected = false;
-		mv.color = mv.color == 'red' ? 'green' : 'red';
-		console.log('to2', selectedMarkerIndex, centering);
+		gotoID(mv.id, 'kontrolle');
 	}
 
-	async function gotoID(id: string) {
+	async function gotoID(id: string, path: string) {
 		sessionStorage.setItem('center', JSON.stringify(map.getCenter()));
 		sessionStorage.setItem('zoom', map.getZoom());
-		await goto('/nk/' + id);
+		await goto(`/${path}/${id}`);
 	}
 
 	async function addMarker() {
 		const id = await nkState.addMarker(map.getCenter());
-		await gotoID(id + '?change');
+		await gotoID(id + '?change', 'nk');
 	}
+
 	function editMarker() {
 		if (selectedMarkerIndex == -1) return;
 		const index = selectedMarkerIndex;
 		const mv = markerValues[selectedMarkerIndex];
 		selectedMarkerIndex = -1;
 		mv.selected = false;
-		gotoID(mv.id);
+		gotoID(mv.id, 'nk');
 	}
 
 	function deleteMarker() {
@@ -404,7 +404,9 @@
 								{mv.name}
 								{#if mv.selected}
 									<Button class="btn m-1 w-24 bg-red-400" onclick={editMarker}>Details</Button>
-									<Button class="btn m-1 w-24 bg-red-400" onclick={toggleMarker}>Kontrolle</Button>
+									<Button class="btn m-1 w-24 bg-red-400" onclick={addControlToMarker}
+										>Kontrolle</Button
+									>
 									<Button class="btn m-1 w-24 bg-red-400" onclick={moveMarker}>Verschieben</Button>
 									<Button class="btn m-1 w-24 bg-red-400" onclick={deleteMarker}>Löschen</Button>
 								{/if}

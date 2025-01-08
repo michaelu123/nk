@@ -20,6 +20,7 @@
 				placeholder="Dein Name"
 				size="lg"
 				class="pl-10"
+				autocomplete="username"
 			/>
 		</Label>
 		<Label for="passwort" class="mb-4">

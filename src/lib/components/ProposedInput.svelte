@@ -36,12 +36,12 @@
 				<option value={nkt}></option>
 			{/each}
 		</datalist> -->
-		<Input type="text" name="typ" bind:value />
+		<Input type="text" name={label} bind:value id="value_id" />
 	</div>
 	<!-- datalist does currently not work on Android Chrome! -->
 	<div class="flex flex-row">
 		<Label class="w-40 shrink-0" for="value_select">{label}auswahl:</Label>
-		<Select class="" name="valueA" id="value-select" bind:value>
+		<Select class="" name={label} id="value-select" bind:value>
 			{#each valueList as nkt}
 				<option value={nkt}>{nkt}</option>
 			{/each}

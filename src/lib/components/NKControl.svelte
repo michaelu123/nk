@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { ControlEntry, MarkerEntry } from '$lib/state.svelte';
-	import { Button, Label, Input, Textarea, Card, Checkbox } from 'svelte-5-ui-lib';
+	import { Button, Label, Textarea, Card, Checkbox } from 'svelte-5-ui-lib';
 	import { getState } from '$lib/state.svelte';
 	import ProposedInput from './ProposedInput.svelte';
 
@@ -8,18 +8,28 @@
 		ctrl: ControlEntry;
 		mv: MarkerEntry;
 		nkSpecies: Map<string, number>;
+		cb: Function | null;
 	}
-	let { ctrl, mv, nkSpecies }: Props = $props();
+	let { ctrl, mv, nkSpecies, cb }: Props = $props();
 	let nkState = getState();
 
-	let isEditMode = $state(false);
+	let isEditMode = $state(!!cb);
 	let nkSpec = $state(ctrl.species ?? '');
 	let comment = $state(ctrl.comment ?? '');
 	let cleaned = $state(ctrl.cleaned);
 
 	async function toggleEditModeAndSaveToDatabase() {
 		if (isEditMode) {
+			if (cb) {
+				// called from /kontrolle/id, to add a new ctrl.
+				if (mv.ctrls) {
+					mv.ctrls = [ctrl, ...mv.ctrls];
+				} else {
+					mv.ctrls = [ctrl];
+				}
+			}
 			await nkState.persistCtrl(mv, ctrl, { species: nkSpec, comment, cleaned });
+			if (cb) cb();
 		}
 		isEditMode = !isEditMode;
 	}
@@ -41,10 +51,8 @@
 		<p class="w-28 shrink-0 text-center font-bold">Gereinigt:</p>
 		{#if isEditMode}
 			<Checkbox bind:checked={cleaned} />
-		{:else if cleaned}
-			<Checkbox checked disabled classLabel="" />
 		{:else}
-			<Checkbox disabled classLabel="" />
+			<Checkbox disabled checked={cleaned} />
 		{/if}
 		<div class="w-full"></div>
 		{#if isEditMode}

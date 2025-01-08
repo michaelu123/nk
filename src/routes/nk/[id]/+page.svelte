@@ -139,7 +139,7 @@
 		{#if !isEditMode && mv.ctrls}
 			<h1 class="m-4 text-lg font-bold">Kontrollen:</h1>
 			{#each mv.ctrls ?? [] as ctrl (ctrl.id)}
-				<NKControl {mv} {ctrl} {nkSpecies} />
+				<NKControl {mv} {ctrl} {nkSpecies} cb={null} />
 			{/each}
 		{/if}
 	</div>
