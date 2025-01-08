@@ -127,11 +127,9 @@
 		}
 		window.clearTimeout(timeoutId);
 		for (const [index, mv] of markerValues.entries()) {
-			// console.log('setfct1', mv.name, mv.mrk);
 			if (mv.mrk) {
 				const newfct = (e: any) => mclick(index, e);
 				const oldfct = fctMap.get(mv.id);
-				// console.log('setfct2', oldfct, newfct);
 				if (oldfct) {
 					mv.mrk.off('click', oldfct);
 				}
@@ -166,6 +164,14 @@
 			centering = false;
 			const mv = markerValues[selectedMarkerIndex];
 			nkState.persistNK(mv, { latLng: mv.latLng });
+			// somehow mv.mrk lost the onclick function!?!?
+			if (mv.mrk) {
+				const oldfct = fctMap.get(mv.id);
+				if (oldfct) {
+					mv.mrk.off('click', oldfct);
+					mv.mrk.on('click', oldfct);
+				}
+			}
 		}
 		if (selectedMarkerIndex == -1) {
 			const mv = markerValues[index];
@@ -191,23 +197,33 @@
 		// 	'selected',
 		// 	markerValues[index].selected
 		// );
-
-		// center = map.getCenter(); // to reposition
 	}
 
 	function onMapClick(e: any) {
-		console.log('omc', selectedMarkerIndex);
 		if (selectedMarkerIndex != -1) {
 			const mv = markerValues[selectedMarkerIndex];
 			mv.selected = false;
 			selectedMarkerIndex = -1;
+			if (centering) {
+				map.off('move', onMapMove);
+				centering = false;
+				nkState.persistNK(mv, { latLng: mv.latLng });
+				// somehow mv.mrk lost the onclick function!?!?
+				if (mv.mrk) {
+					const oldfct = fctMap.get(mv.id);
+					if (oldfct) {
+						mv.mrk.off('click', oldfct);
+						mv.mrk.on('click', oldfct);
+					}
+				}
+			}
 		}
 	}
 
 	function onMapMove(e: any) {
+		if (selectedMarkerIndex == -1) return;
 		const center = map.getCenter();
 		markerValues[selectedMarkerIndex].latLng = center;
-		// console.log('omm');
 	}
 
 	function logmap() {
@@ -216,17 +232,13 @@
 	}
 
 	function moveMarker() {
-		console.log('mm1', selectedMarkerIndex, centering);
 		if (selectedMarkerIndex == -1) return;
-		console.log('centering', centering);
 		map.on('move', onMapMove);
 		centering = true;
 		onMapMove(null);
-		console.log('mm2', selectedMarkerIndex, centering);
 	}
 
 	function addControlToMarker() {
-		console.log('addControlToMarker', selectedMarkerIndex, centering);
 		if (selectedMarkerIndex == -1) return;
 		const mv = markerValues[selectedMarkerIndex];
 		selectedMarkerIndex = -1;
@@ -255,7 +267,6 @@
 	}
 
 	function deleteMarker() {
-		console.log('deleteMarker', selectedMarkerIndex);
 		if (selectedMarkerIndex == -1) return;
 		nkState.deleteMarker(selectedMarkerIndex);
 		selectedMarkerIndex = -1;
@@ -298,7 +309,6 @@
 			maximumAge: 5000
 		};
 		locid = navigator.geolocation.watchPosition(posSucc, posErr, options);
-		console.log('locid', locid);
 	}
 
 	function posStart() {
@@ -315,7 +325,7 @@
 				posRestart();
 			} else {
 				geoloc = false;
-				console.log('geolocation is available');
+				console.log('geolocation is not available');
 			}
 			isGPSon = true;
 		}

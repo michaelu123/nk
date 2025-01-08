@@ -3,6 +3,7 @@
 	import { Button, Label, Textarea, Card, Checkbox } from 'svelte-5-ui-lib';
 	import { getState } from '$lib/state.svelte';
 	import ProposedInput from './ProposedInput.svelte';
+	import { goto } from '$app/navigation';
 
 	interface Props {
 		ctrl: ControlEntry;
@@ -35,10 +36,15 @@
 	}
 
 	function setStateBack() {
-		nkSpec = ctrl.species ?? '';
-		comment = ctrl.comment ?? '';
-		cleaned = ctrl.cleaned;
-		isEditMode = false;
+		if (cb) {
+			// i.e. if we add a control, cancel
+			goto('/');
+		} else {
+			nkSpec = ctrl.species ?? '';
+			comment = ctrl.comment ?? '';
+			cleaned = ctrl.cleaned;
+			isEditMode = false;
+		}
 	}
 </script>
 
