@@ -26,7 +26,7 @@ export const load: LayoutLoad = async ({ data, url }) => {
 			} else {
 				console.log('StorageBuckets not persisted');
 				if (useBucketsAnyways) {
-					console.log('StorageBuckts used nevertheless');
+					console.log('StorageBuckets used nevertheless');
 					persisted = true;
 				}
 			}

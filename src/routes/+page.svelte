@@ -73,6 +73,7 @@
 	let timeoutId: number = -1;
 	$effect(() => {
 		if (map) {
+			console.log('mapeffect');
 			map.on('click', onMapClick);
 			// map.on('move', onMapMove);
 			// map.setMaxZoom(16);
@@ -126,6 +127,7 @@
 			}
 		}
 		window.clearTimeout(timeoutId);
+		console.log('1markers');
 		for (const [index, mv] of markerValues.entries()) {
 			if (mv.mrk) {
 				const newfct = (e: any) => mclick(index, e);
@@ -254,6 +256,7 @@
 
 	async function addMarker() {
 		const id = await nkState.addMarker(map.getCenter());
+		// no need to call markers here, because we change the page, and on return the map effect is called, calling markers
 		await gotoID(id + '?change', 'nk');
 	}
 
@@ -266,10 +269,18 @@
 		gotoID(mv.id, 'nk');
 	}
 
-	function deleteMarker() {
+	async function deleteMarker() {
 		if (selectedMarkerIndex == -1) return;
-		nkState.deleteMarker(selectedMarkerIndex);
-		selectedMarkerIndex = -1;
+		const mv = markerValues[selectedMarkerIndex];
+		mv.selected = false;
+		const confirmDelete = window.confirm(
+			`Sie wollen die Daten des Nistkasten ${mv.name} wirklich löschen?`
+		);
+		if (confirmDelete) {
+			await nkState.deleteMarker(selectedMarkerIndex);
+			selectedMarkerIndex = -1;
+			markers(); // we have no effect on markerValues, because it is called too often, so we call markers ourselves
+		}
 	}
 
 	function centerMap(pos: number[]) {

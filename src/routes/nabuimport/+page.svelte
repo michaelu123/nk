@@ -112,7 +112,7 @@
 				image: null,
 				createdAt: today,
 				changedAt: null,
-				color: 'green'
+				color: 'red'
 			});
 			await nkState.importMV(mv);
 			cnt++;

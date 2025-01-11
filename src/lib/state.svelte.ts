@@ -25,7 +25,7 @@ export class MarkerEntry implements MarkerEntryProps {
 	mrk: any = $state(null);
 	ctrls: ControlEntry[] | null = $state(null);
 	selected: boolean = $state(false);
-	color: 'green' | 'red' = $state('green');
+	color: 'green' | 'red' = $state('red');
 	lastCleaned: Date | null = $state(null);
 	id = '';
 	name = $state('');
@@ -58,7 +58,7 @@ export class MarkerEntry implements MarkerEntryProps {
 			mrk: null,
 			ctrls: null,
 			selected: false,
-			color: 'green',
+			color: this.color,
 			lastCleaned: this.lastCleaned,
 			id: this.id,
 			name: this.name,
@@ -330,7 +330,7 @@ export class State implements StateProps {
 			mrk: null,
 			ctrls: [],
 			selected: false,
-			color: 'green',
+			color: 'red',
 			lastCleaned: null,
 			id,
 			name: '',
@@ -456,6 +456,22 @@ export class State implements StateProps {
 		} else {
 			this.nkSpecies.set(nkSpec, 1);
 		}
+	}
+
+	addPhoto(id: string, blob: Blob) {
+		const mv = this.markerValues.find((m) => m.id == id);
+		// img.src = URL.createObjectURL(blob);
+
+		// const js = JSON.stringify(ctrl);
+		// if (this.idb) {
+		// 	try {
+		// 		await this.idb.put('kontrollen', js, ctrl.id);
+		// 	} catch (e: any) {
+		// 		console.log('err idb.put', e);
+		// 	}
+		// } else {
+		// 	localStorage.setItem('_k_' + ctrl.id, js);
+		// }
 	}
 }
 

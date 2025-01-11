@@ -63,8 +63,7 @@
 		if (!name) errName = 'Bitte Namen vergeben';
 		if (!nkType) errType = 'Bitte Nistkastentyp vergeben';
 		if (!name || !nkType) return;
-		console.log('takephoto');
-		image = 'xxx';
+		goto('/photo?mvid=' + mv!.id);
 	}
 </script>
 
