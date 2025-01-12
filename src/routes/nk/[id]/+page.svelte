@@ -2,9 +2,9 @@
 	import { goto } from '$app/navigation';
 	import ProposedInput from '$lib/components/ProposedInput.svelte';
 	import NKControl from '$lib/components/NKControl.svelte';
-	import { getState } from '$lib/state.svelte';
-	import { error, redirect } from '@sveltejs/kit';
-	import { Textarea, Label, Button, Input, Card } from 'svelte-5-ui-lib';
+	import { getState, MarkerEntry, type ControlEntry } from '$lib/state.svelte';
+	import { redirect, error } from '@sveltejs/kit';
+	import { Textarea, Label, Button, Input, Card, Checkbox } from 'svelte-5-ui-lib';
 
 	let nkState = getState();
 	let { nkTypes, nkSpecies, markerValues, isLoading } = $derived(nkState);
@@ -12,9 +12,14 @@
 	if (!data.id) {
 		redirect(302, '/');
 	}
-	let id = $derived(data.id);
-	let mv = $derived(markerValues.find((m) => m.id == id));
-	let isEditMode = $state(data.url.searchParams.toString().includes('change='));
+	let id = $state(data.id);
+	let nknew = $state(data.id == 'new');
+	const ll = data.url.searchParams.get('ll') || '';
+	let mv = $derived(nknew ? newMV(ll) : markerValues.find((m) => m.id == id));
+	const sp = data.url.searchParams.toString();
+	let change = $state(sp.includes('change'));
+	// svelte-ignore state_referenced_locally
+	let isEditMode = $state(change || nknew);
 	let name = $state('');
 	let nkType = $state('');
 	let comment = $state('');
@@ -22,6 +27,31 @@
 	let errName = $state('');
 	let errType = $state('');
 	let image: string = $state('');
+	let cleaned = $state(true);
+
+	function newMV(coords?: string): MarkerEntry {
+		if (!coords) error(404, 'missing parameter ll=lat,lng');
+		const latlng = coords.split(',');
+		const lat = +latlng[0],
+			lng = +latlng[1];
+		const today = new Date();
+		const id = today.valueOf().toString();
+		const mv = new MarkerEntry({
+			latLng: [lat, lng],
+			ctrls: [],
+			selected: false,
+			color: 'red',
+			lastCleaned: null,
+			id,
+			name: '',
+			nkType: '',
+			comment: '',
+			image: null,
+			createdAt: today,
+			changedAt: null
+		});
+		return mv;
+	}
 
 	// Another effect hack: mv appears eventually, and only then do I want to init name, nkType etc.
 	// when saving, I do not want this effect. So I call setStateBack in the effect only once..
@@ -39,7 +69,7 @@
 		nkType = mv!.nkType;
 		comment = mv!.comment;
 		image = mv!.image ?? '';
-		isEditMode = inited ? false : data.url.searchParams.toString().includes('change=');
+		isEditMode = inited ? false : nknew || change;
 	}
 
 	function goBack() {
@@ -47,14 +77,38 @@
 		goto('/');
 	}
 
-	async function toggleEditModeAndSaveToDatabase() {
+	async function toggleEditModeAndSaveToDatabase(takePhoto: boolean) {
 		if (isEditMode && mv) {
 			if (!name) errName = 'Bitte Namen vergeben';
 			if (!nkType) errType = 'Bitte Nistkastentyp vergeben';
 			if (!name || !nkType) return;
 			await nkState.persistNK(mv, { name, nkType, comment, image });
+			if (nknew) {
+				markerValues.push(mv);
+			}
+			if (nknew && cleaned) {
+				const today = new Date();
+				const ctrl: ControlEntry = {
+					id: Date.now().toString(),
+					nkid: mv.id,
+					name: mv.name,
+					date: today,
+					species: null,
+					comment: 'Neu aufgehängt',
+					image: null,
+					cleaned: true,
+					createdAt: today,
+					changedAt: null
+				};
+				mv.ctrls = [ctrl];
+				nkState.persistCtrl(mv, ctrl, {});
+			}
 			nkState.updNkTypes(nkType);
-			goBack();
+			if (nknew && takePhoto) {
+				goto('/photo?mvid=' + mv.id);
+			} else {
+				goBack();
+			}
 		}
 		isEditMode = !isEditMode;
 	}
@@ -70,16 +124,17 @@
 {#if mv}
 	<div id="details" class="overflow-x-clip">
 		<h1 class="my-8 text-center text-2xl font-semibold">Nistkasten</h1>
-		<div class="m-1 flex items-center justify-center">
-			{#if mv.image || mv.name.includes('2')}
-				<img src="/src/lib/assets/rewards-header-image-witcher3@2x.webp" alt="" />
-			{:else}
-				<button onclick={takePhoto}>
-					<img src="/src/lib/assets/photo-camera-svgrepo-com.svg" alt="" />
-				</button>
-			{/if}
-		</div>
-
+		{#if !nknew}
+			<div class="m-1 flex items-center justify-center">
+				{#if mv.image || mv.name.includes('2')}
+					<img src="/src/lib/assets/rewards-header-image-witcher3@2x.webp" alt="" />
+				{:else}
+					<button onclick={takePhoto}>
+						<img src="/src/lib/assets/photo-camera-svgrepo-com.svg" alt="" />
+					</button>
+				{/if}
+			</div>
+		{/if}
 		{#if isEditMode}
 			<form class="m-4 flex flex-col items-baseline gap-4">
 				<div class="flex w-full flex-row">
@@ -94,9 +149,15 @@
 					<p class="w-full text-center text-red-500">{errType}</p>
 				{/if}
 				<div class="flex w-full flex-row">
-					<Label class="w-40 shrink-0" for="comment_id">Kommentar:</Label>
+					<Label class="w-40 shrink-0" for="comment_id">Bemerkungen:</Label>
 					<Textarea name="comment" id="comment_id" bind:value={comment} rows={2}></Textarea>
 				</div>
+				{#if nknew}
+					<div class="flex w-full flex-row">
+						<Label class="w-40 shrink-0" for="comment_id">Gereinigt:</Label>
+						<Checkbox bind:checked={cleaned} />
+					</div>
+				{/if}
 			</form>
 		{:else}
 			<Card class="m-4" size="xl">
@@ -115,7 +176,7 @@
 					</p>
 				</div>
 				<div class="mb-4 flex">
-					<p class="w-40 shrink-0 font-bold">Kommentar</p>
+					<p class="w-40 shrink-0 font-bold">Bemerkungen</p>
 					<Textarea name="comment" id="comment_id" value={mv.comment} readonly rows={2}></Textarea>
 				</div>
 			</Card>
@@ -123,14 +184,20 @@
 
 		<div class="mb-4 ml-4 mt-6 text-left">
 			{#if isEditMode}
-				<Button class="m-1" onclick={toggleEditModeAndSaveToDatabase}>Speichern</Button>
+				<Button class="m-1" onclick={() => toggleEditModeAndSaveToDatabase(false)}>Speichern</Button
+				>
+				{#if nknew}
+					<Button class="m-1" onclick={() => toggleEditModeAndSaveToDatabase(true)}
+						>Speichern und Bild aufnehmen</Button
+					>
+				{/if}
 				{#if mv.name && mv.nkType}
 					<Button class="m-1" onclick={setStateBack}>Nicht speichern</Button>
 					<Button class="m-1" onclick={goBack}>Zurück zur Karte</Button>
 					<Button class="m-1" onclick={takePhoto}>Neues Bild aufnehmen</Button>
 				{/if}
 			{:else}
-				<Button class="m-1" onclick={toggleEditModeAndSaveToDatabase}>Ändern</Button>
+				<Button class="m-1" onclick={() => toggleEditModeAndSaveToDatabase(false)}>Ändern</Button>
 				<Button class="m-1" onclick={goBack}>Zurück zur Karte</Button>
 			{/if}
 		</div>

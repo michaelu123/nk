@@ -317,29 +317,6 @@ export class State implements StateProps {
 		}
 	}
 
-	async addMarker(ll: any): Promise<string> {
-		const today = new Date();
-		const id = today.valueOf().toString();
-		const mv = new MarkerEntry({
-			latLng: [ll.lat, ll.lng],
-			ctrls: [],
-			selected: false,
-			color: 'red',
-			lastCleaned: null,
-			id,
-			name: '',
-			nkType: '',
-			comment: '',
-			image: null,
-			createdAt: today,
-			changedAt: null
-		});
-		console.log('addMarker mv', mv.mv2str());
-		this.markerValues.push(mv);
-		await this.persistNK(mv, {});
-		return id;
-	}
-
 	async deleteMarker(index: number) {
 		if (index == -1) return;
 		const mv = this.markerValues[index];

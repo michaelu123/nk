@@ -73,7 +73,7 @@
 	</div>
 
 	{#if isEditMode}
-		<form class="my-4 flex flex-col items-baseline gap-4">
+		<form class="my-4 mr-2 flex flex-col items-baseline gap-4">
 			<ProposedInput itemMap={nkSpecies} bind:value={nkSpec} label="Art" />
 			<div class="flex w-full flex-row">
 				<Label class="w-40 shrink-0" for="comment_id">Bemerkungen</Label>
@@ -81,12 +81,12 @@
 			</div>
 		</form>
 	{:else}
-		<div class="mb-4 flex">
+		<div class="mb-4 mr-2 flex">
 			<p class="w-40 shrink-0 font-bold">Art</p>
 			<p>{ctrl.species}</p>
 		</div>
-		<div class="mb-4 flex">
-			<p class="w-40 shrink-0 font-bold">Beschreibung</p>
+		<div class="mb-4 mr-2 flex">
+			<p class="w-40 shrink-0 font-bold">Bemerkungen</p>
 			<Textarea name="comment" id="comment_id" value={comment} readonly rows={2}></Textarea>
 		</div>
 	{/if}

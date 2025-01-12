@@ -38,7 +38,6 @@
 	});
 
 	function cb() {
-		console.log('cb', ctrl);
 		goto('/nk/' + id);
 	}
 </script>

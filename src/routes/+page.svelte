@@ -184,8 +184,18 @@
 	}
 
 	async function addMarker() {
-		const id = await nkState.addMarker(map.getCenter());
-		await gotoID(id + '?change', 'nk');
+		unselect();
+		// const id = await nkState.addMarker(map.getCenter());
+		// await gotoID(id + '?new', 'nk');
+		const pos = map.getCenter();
+		await goto('/nk/new?ll=' + pos.lat + ',' + pos.lng);
+	}
+
+	function unselect() {
+		if (selectedMarkerIndex == -1) return;
+		const mv = markerValues[selectedMarkerIndex];
+		selectedMarkerIndex = -1;
+		mv.selected = false;
 	}
 
 	function editMarker() {
@@ -213,6 +223,7 @@
 	function centerMap(pos: number[]) {
 		map.flyTo(pos, map.getZoom());
 		isSidebarOpen = false;
+		unselect();
 	}
 
 	function updDefaultCenter() {
@@ -351,7 +362,7 @@
 							<Popup class="flex w-28 flex-col items-center">
 								{mv.name}
 								{#if mv.selected}
-									<Button class="btn m-1 w-24 bg-red-400" onclick={editMarker}>Details</Button>
+									<Button class="btn m-1 w-24 bg-red-400" onclick={editMarker}>Anzeigen</Button>
 									<Button class="btn m-1 w-24 bg-red-400" onclick={addControlToMarker}
 										>Kontrolle</Button
 									>
