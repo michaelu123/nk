@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { Sidebar, SidebarGroup, SidebarItem, SidebarButton, uiHelpers } from 'svelte-5-ui-lib';
 	import { page } from '$app/stores';
-	import { getState } from '$lib/state.svelte';
+	import { getState, MarkerEntry } from '$lib/state.svelte';
 	import { goto } from '$app/navigation';
 
 	let nkState = getState();
@@ -41,10 +41,6 @@
 	let radius = $state(100);
 	let followingGPS = $state(false);
 	let isGPSon = $state(false);
-	// let posTime = $state(Date.now()); // TODO weg
-	// let nowTime = $state(Date.now());
-
-	// window.setInterval(() => (nowTime = Date.now()), 1000);
 
 	const commonIconOptions = {
 		iconSize: [40, 40], // size of the icon
@@ -90,65 +86,17 @@
 				sessionStorage.removeItem('center');
 				sessionStorage.removeItem('zoom');
 			}
-			// posStart(); // start watchPosition from user gesture!
-			timeoutId = window.setTimeout(markers, 100);
 		}
 	});
-
-	// Cannot get this to work... with dependencies on markerValues  this effect is called a million times.
-	// It should be called only on changes of isLoading, but either it is called far too often,
-	// when markers() is not called from untrack, or not at all, when isLoading changes to false.
-
-	// $effect(() => {
-	// 	$inspect.trace('e3');
-	// 	console.log('3effect', isLoading);
-	// 	untrack(markers);
-	// });
-
-	const fctMap = new Map<string, any>();
-
-	// I need to set the markers.on() functions, after a) the markers were all loaded from the store,
-	// and b) the map has done the bind:instance to mv.mrk for all Sveaflet Markers.
-	// I don't know how else I can get access to the leaflet marker underlying the sveaflet Marker.
-
-	// Another problem: if I use setInterval, a clearInterval call instead of the clearTimeout does not work...
-	// Therefore a setTimeout sequence. Same for set/clearInterval without window. in front, seemingly a NodeJS.set/clearInterval.
-	function markers() {
-		if (isLoading) {
-			window.clearTimeout(timeoutId);
-			timeoutId = window.setTimeout(markers, 100);
-			return;
-		}
-		for (const mv of markerValues) {
-			if (!mv.mrk) {
-				window.clearTimeout(timeoutId);
-				timeoutId = window.setTimeout(markers, 100);
-				return;
-			}
-		}
-		window.clearTimeout(timeoutId);
-		console.log('1markers');
-		for (const [index, mv] of markerValues.entries()) {
-			if (mv.mrk) {
-				const newfct = (e: any) => mclick(index, e);
-				const oldfct = fctMap.get(mv.id);
-				if (oldfct) {
-					mv.mrk.off('click', oldfct);
-				}
-				// mv.mrk.clearAllEventListeners(); or mv.mrk.off() does not have the same effect!?
-				mv.mrk.on('click', newfct);
-				fctMap.set(mv.id, newfct);
-			}
-		}
-	}
 
 	function toggleDL() {
 		document.documentElement.classList.toggle('dark');
 	}
 
-	function mclick(index: number, e: any) {
+	function mclick(mv: MarkerEntry, index: number, e: any) {
 		// console.log(
 		// 	'mc1',
+		//  mv.name,
 		// 	'index',
 		// 	index,
 		// 	'selindex',
@@ -164,34 +112,23 @@
 		if (centering) {
 			map.off('move', onMapMove);
 			centering = false;
-			const mv = markerValues[selectedMarkerIndex];
 			nkState.persistNK(mv, { latLng: mv.latLng });
-			// somehow mv.mrk lost the onclick function!?!?
-			if (mv.mrk) {
-				const oldfct = fctMap.get(mv.id);
-				if (oldfct) {
-					mv.mrk.off('click', oldfct);
-					mv.mrk.on('click', oldfct);
-				}
-			}
 		}
 		if (selectedMarkerIndex == -1) {
-			const mv = markerValues[index];
 			mv.selected = true;
 			selectedMarkerIndex = index;
 		} else if (index == selectedMarkerIndex) {
-			const mv = markerValues[index];
 			mv.selected = false;
 			selectedMarkerIndex = -1;
 		} else {
-			let mv = markerValues[selectedMarkerIndex];
-			mv.selected = false;
-			mv = markerValues[index];
+			const othermv = markerValues[selectedMarkerIndex];
+			othermv.selected = false;
 			mv.selected = true;
 			selectedMarkerIndex = index;
 		}
 		// console.log(
 		// 	'mc2',
+		//  mv.name,
 		// 	'index',
 		// 	selectedMarkerIndex,
 		// 	'centering',
@@ -210,14 +147,6 @@
 				map.off('move', onMapMove);
 				centering = false;
 				nkState.persistNK(mv, { latLng: mv.latLng });
-				// somehow mv.mrk lost the onclick function!?!?
-				if (mv.mrk) {
-					const oldfct = fctMap.get(mv.id);
-					if (oldfct) {
-						mv.mrk.off('click', oldfct);
-						mv.mrk.on('click', oldfct);
-					}
-				}
 			}
 		}
 	}
@@ -256,7 +185,6 @@
 
 	async function addMarker() {
 		const id = await nkState.addMarker(map.getCenter());
-		// no need to call markers here, because we change the page, and on return the map effect is called, calling markers
 		await gotoID(id + '?change', 'nk');
 	}
 
@@ -279,7 +207,6 @@
 		if (confirmDelete) {
 			await nkState.deleteMarker(selectedMarkerIndex);
 			selectedMarkerIndex = -1;
-			markers(); // we have no effect on markerValues, because it is called too often, so we call markers ourselves
 		}
 	}
 
@@ -412,7 +339,7 @@
 					<Circle latLng={currPos} options={{ radius, fillOpacity: 0.1 }} />
 				{/key}
 				{#each markerValues as mv, index (mv['latLng'])}
-					<Marker latLng={mv.latLng} bind:instance={mv.mrk} {index}>
+					<Marker latLng={mv.latLng} {index} onclick={(e: any) => mclick(mv, index, e)}>
 						{#key mv.selected}
 							<Icon
 								options={mv.selected

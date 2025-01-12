@@ -7,7 +7,6 @@ const MAX_TIME_MS = MAX_DAYS * 24 * 60 * 60 * 1000;
 
 export interface MarkerEntryProps {
 	latLng: number[];
-	mrk: any | null;
 	ctrls: ControlEntry[] | null;
 	selected: boolean;
 	color: 'green' | 'red';
@@ -22,7 +21,6 @@ export interface MarkerEntryProps {
 }
 export class MarkerEntry implements MarkerEntryProps {
 	latLng: number[] = $state([]);
-	mrk: any = $state(null);
 	ctrls: ControlEntry[] | null = $state(null);
 	selected: boolean = $state(false);
 	color: 'green' | 'red' = $state('red');
@@ -40,7 +38,6 @@ export class MarkerEntry implements MarkerEntryProps {
 	}
 	updateMarkerEntry(data: MarkerEntryProps) {
 		this.latLng = data.latLng;
-		this.mrk = data.mrk;
 		this.ctrls = data.ctrls;
 		this.selected = data.selected;
 		this.color = data.color;
@@ -55,7 +52,6 @@ export class MarkerEntry implements MarkerEntryProps {
 	toObj(): MarkerEntryProps {
 		let obj: MarkerEntryProps = {
 			latLng: this.latLng,
-			mrk: null,
 			ctrls: null,
 			selected: false,
 			color: this.color,
@@ -74,7 +70,6 @@ export class MarkerEntry implements MarkerEntryProps {
 	mv2str() {
 		const obj = this.toObj();
 		const js = JSON.stringify(obj, (k, v) => {
-			if (k == 'mrk') return undefined;
 			if (k == 'ctrls') return undefined;
 			if (k == 'selected') return undefined;
 			if (k == 'color') return undefined;
@@ -327,7 +322,6 @@ export class State implements StateProps {
 		const id = today.valueOf().toString();
 		const mv = new MarkerEntry({
 			latLng: [ll.lat, ll.lng],
-			mrk: null,
 			ctrls: [],
 			selected: false,
 			color: 'red',

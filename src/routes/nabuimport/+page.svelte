@@ -101,7 +101,6 @@
 			if (abgehängt) continue;
 			const mv = new MarkerEntry({
 				latLng: [lat, lng],
-				mrk: null,
 				ctrls: [],
 				selected: false,
 				lastCleaned: null,

@@ -6,7 +6,6 @@ const mucLat = 48.137236594542834,
 export let markerVals: MarkerEntryProps[] = [
 	{
 		latLng: [mucLat + 0.001, mucLng + 0.001],
-		mrk: null,
 		ctrls: null,
 		selected: false,
 		id: 'one',
@@ -21,7 +20,6 @@ export let markerVals: MarkerEntryProps[] = [
 	},
 	{
 		latLng: [mucLat - 0.001, mucLng + 0.001],
-		mrk: null,
 		ctrls: null,
 		selected: false,
 		id: 'two',
@@ -36,7 +34,6 @@ export let markerVals: MarkerEntryProps[] = [
 	},
 	{
 		latLng: [mucLat + 0.001, mucLng - 0.001],
-		mrk: null,
 		ctrls: null,
 		selected: false,
 		id: 'three',
@@ -51,7 +48,6 @@ export let markerVals: MarkerEntryProps[] = [
 	},
 	{
 		latLng: [mucLat - 0.001, mucLng - 0.001],
-		mrk: null,
 		ctrls: null,
 		selected: false,
 		id: 'four',
