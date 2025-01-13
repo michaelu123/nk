@@ -5,6 +5,9 @@
 	import { goto } from '$app/navigation';
 
 	let nkState = getState();
+	let { data } = $props();
+	let { rootDir } = data;
+
 	let { markerValues, maxBounds, defaultCenter, defaultZoom, isLoading } = $derived(nkState);
 
 	// sidebar stuff
@@ -61,6 +64,7 @@
 	};
 
 	import selectedMarker from '$lib/assets/yellowMarker.svg';
+	import { getFile, removePath, toFile, walkFS } from '$lib/fs';
 	const selectedMarkerOptions = {
 		...commonIconOptions,
 		iconUrl: selectedMarker
@@ -288,6 +292,14 @@
 		}
 		isSidebarOpen = false;
 	}
+
+	async function lsR() {
+		try {
+			await walkFS(rootDir!, '');
+		} catch (e) {
+			console.log('lsRe', e);
+		}
+	}
 </script>
 
 {#snippet header()}
@@ -402,7 +414,7 @@
 			<SidebarItem label={isGPSon ? 'GPS aus' : 'GPS ein'} onclick={posStart}></SidebarItem>
 			<SidebarItem label={followingGPS ? 'GPS nicht folgen' : 'GPS folgen'} onclick={followGPS}
 			></SidebarItem>
-			<SidebarItem label="Sidebar" href="/components/sidebar"></SidebarItem>
+			<SidebarItem label="ls-R" onclick={lsR}></SidebarItem>
 		</SidebarGroup>
 		<SidebarGroup border={true}>
 			<SidebarItem label="Dashboard" href="/"></SidebarItem>

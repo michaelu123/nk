@@ -2,7 +2,7 @@
 	import '../app.css';
 	import { setState } from '$lib/state.svelte';
 	let { children, data } = $props();
-	setState({ user: data.user, idb: data.idb, bucket: data.bucket });
+	setState({ user: data.user, idb: data.idb, bucket: data.bucket, rootDir: data.rootDir });
 </script>
 
 <main>

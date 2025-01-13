@@ -4,7 +4,8 @@
 	import NKControl from '$lib/components/NKControl.svelte';
 	import { getState, MarkerEntry, type ControlEntry } from '$lib/state.svelte';
 	import { redirect, error } from '@sveltejs/kit';
-	import { Textarea, Label, Button, Input, Card, Checkbox } from 'svelte-5-ui-lib';
+	import { Textarea, Label, Button, Input, Card, Checkbox, Spinner } from 'svelte-5-ui-lib';
+	import { getFile, toFile } from '$lib/fs.js';
 
 	let nkState = getState();
 	let { nkTypes, nkSpecies, markerValues, isLoading } = $derived(nkState);
@@ -27,7 +28,19 @@
 	let errName = $state('');
 	let errType = $state('');
 	let image: string = $state('');
+	let imgUrl = $derived(fetchImage()); // a Promise<string> ! see https://github.com/sveltejs/svelte/issues/13722
+
 	let cleaned = $state(true);
+
+	async function fetchImage() {
+		if (mv && mv.image && data.rootDir) {
+			const fe = await getFile(data.rootDir, mv.image);
+			const f = await toFile(fe);
+			const blob = new Blob([f]);
+			return URL.createObjectURL(blob);
+		}
+		return '';
+	}
 
 	function newMV(coords?: string): MarkerEntry {
 		if (!coords) error(404, 'missing parameter ll=lat,lng');
@@ -126,13 +139,18 @@
 		<h1 class="my-8 text-center text-2xl font-semibold">Nistkasten</h1>
 		{#if !nknew}
 			<div class="m-1 flex items-center justify-center">
-				{#if mv.image || mv.name.includes('2')}
-					<img src="/src/lib/assets/rewards-header-image-witcher3@2x.webp" alt="" />
-				{:else}
-					<button onclick={takePhoto}>
-						<img src="/src/lib/assets/photo-camera-svgrepo-com.svg" alt="" />
-					</button>
-				{/if}
+				{#await imgUrl}
+					<Spinner size="16" />
+				{:then url}
+					{#if url}
+						<img src={url} alt="" />
+					{:else}
+						<button onclick={takePhoto}>
+							<img src="/src/lib/assets/photo-camera-svgrepo-com.svg" alt="" />
+							<p>Photo aufnehmen</p>
+						</button>
+					{/if}
+				{/await}
 			</div>
 		{/if}
 		{#if isEditMode}

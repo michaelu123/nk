@@ -5,6 +5,7 @@
 	import { getState, type ControlEntry, MarkerEntry } from '$lib/state.svelte';
 	import { goto } from '$app/navigation';
 	import { Button } from 'svelte-5-ui-lib';
+
 	let nkState = getState();
 	let isLoading = $state(false);
 	let errorMessage = $state('');
@@ -78,6 +79,11 @@
 		}
 	}
 
+	function datum2Date(datum: string): Date {
+		const d = datum.slice(6, 10) + '-' + datum.slice(3, 5) + '-' + datum.slice(0, 2); // 27.12.2024
+		return new Date(d);
+	}
+
 	async function importMarker(records: string[][]) {
 		// ID der Nisthilfe;Gruppenname;Name der Nisthilfe;Typ der Nisthilfe;Hersteller;Besonderheit;Befestigung;Höhe;Ausrichtung;Kameralink;Grundsätzlich reinigen;Bemerkung/Hinweise;Aufgehängt;Abgehängt;GPS Latitude;GPS Longitude;Erfasser;Gebiet;
 		const headers = records[0];
@@ -88,6 +94,7 @@
 		const latIndex = headers.findIndex((h) => h === 'GPS Latitude');
 		const lngIndex = headers.findIndex((h) => h === 'GPS Longitude');
 		const gebietIndex = headers.findIndex((h) => h === 'Gebiet');
+		const aufgehängtIndex = headers.findIndex((h) => h === 'Aufgehängt'); // 21.11.2023
 		const abgehängtIndex = headers.findIndex((h) => h === 'Abgehängt');
 		const today = new Date();
 		for (const r of records.slice(1)) {
@@ -97,8 +104,10 @@
 			const comment = r[commentIndex];
 			const lat = parseFloat(r[latIndex].replace(',', '.')); // TODO: check if within bounds
 			const lng = parseFloat(r[lngIndex].replace(',', '.'));
+			const aufgehängt = r[aufgehängtIndex];
 			const abgehängt = r[abgehängtIndex];
 			if (abgehängt) continue;
+			const aufgehängtDate = datum2Date(aufgehängt);
 			const mv = new MarkerEntry({
 				latLng: [lat, lng],
 				ctrls: [],
@@ -109,18 +118,13 @@
 				nkType: typ,
 				comment,
 				image: null,
-				createdAt: today,
+				createdAt: aufgehängtDate,
 				changedAt: null,
 				color: 'red'
 			});
 			await nkState.importMV(mv);
 			cnt++;
 		}
-	}
-
-	function datum2Date(datum: string): Date {
-		const d = datum.slice(6, 10) + '-' + datum.slice(3, 5) + '-' + datum.slice(0, 2); // 27.12.2024
-		return new Date(d);
 	}
 
 	async function importKontrollen(records: string[][]) {

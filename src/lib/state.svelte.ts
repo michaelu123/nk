@@ -1,6 +1,7 @@
 import { getContext, setContext } from 'svelte';
 import { nkDefaultTypes, nkDefaultSpecies } from './fakeDB';
 import type { IDBPDatabase } from 'idb';
+import { removePath } from './fs';
 
 const MAX_DAYS = 100; // TODO configurable?
 const MAX_TIME_MS = MAX_DAYS * 24 * 60 * 60 * 1000;
@@ -122,18 +123,20 @@ export interface User {
 }
 
 export interface StateProps {
-	user: User | null;
+	user: User | null | undefined;
 	idb: IDBPDatabase | null;
 	bucket: any | null;
+	rootDir: FileSystemDirectoryEntry | null | undefined;
 }
 
 let mucLat = 48.137236594542834,
 	mucLng = 11.576174072626772;
 
 export class State implements StateProps {
-	user = $state<User | null>(null);
+	user = $state<User | null | undefined>(null);
 	idb: IDBPDatabase | null = null;
 	bucket: any | null = null;
+	rootDir: FileSystemDirectoryEntry | null | undefined = null;
 
 	defaultCenter = $state([mucLat, mucLng]);
 	defaultZoom = $state(16);
@@ -153,7 +156,9 @@ export class State implements StateProps {
 	updateState(data: StateProps) {
 		this.user = data.user;
 		this.idb = data.idb;
-		this.bucket = data.bucket; // keep a ref to bucket, so that it does not close
+		this.bucket = data.bucket;
+		this.rootDir = data.rootDir;
+		// keep a ref to bucket, so that it does not close
 		this.fetchData();
 	}
 
@@ -327,12 +332,16 @@ export class State implements StateProps {
 		} else {
 			localStorage.removeItem(id);
 		}
+		const image = mv.image;
+		if (this.rootDir && image) await removePath(this.rootDir, image);
 		for (const ctrl of mv.ctrls ?? []) {
 			if (this.idb) {
-				await this.idb!.delete('kontrollen', ctrl.id);
+				await this.idb.delete('kontrollen', ctrl.id);
 			} else {
 				localStorage.removeItem(ctrl.id);
 			}
+			const image = ctrl.image;
+			if (this.rootDir && image) await removePath(this.rootDir, image);
 		}
 	}
 
@@ -429,20 +438,14 @@ export class State implements StateProps {
 		}
 	}
 
-	addPhoto(id: string, blob: Blob) {
+	async addPhoto(id: string, path: string) {
 		const mv = this.markerValues.find((m) => m.id == id);
-		// img.src = URL.createObjectURL(blob);
-
-		// const js = JSON.stringify(ctrl);
-		// if (this.idb) {
-		// 	try {
-		// 		await this.idb.put('kontrollen', js, ctrl.id);
-		// 	} catch (e: any) {
-		// 		console.log('err idb.put', e);
-		// 	}
-		// } else {
-		// 	localStorage.setItem('_k_' + ctrl.id, js);
-		// }
+		if (mv) {
+			await this.persistNK(mv, { image: path });
+			mv.image = path;
+		} else {
+			console.log(`cannot find nkid ${id} for image in ${path}`);
+		}
 	}
 }
 
