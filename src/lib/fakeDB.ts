@@ -1,3 +1,4 @@
+/* 
 import type { MarkerEntryProps } from './state.svelte';
 
 const mucLat = 48.137236594542834,
@@ -61,6 +62,7 @@ export let markerVals: MarkerEntryProps[] = [
 		color: 'red'
 	}
 ];
+*/
 
 export let nkDefaultTypes = [
 	'Nistkasten',

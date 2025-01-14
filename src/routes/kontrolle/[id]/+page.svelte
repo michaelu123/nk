@@ -16,15 +16,16 @@
 	let today = new Date();
 	let ctrl: ControlEntry = $state({
 		id: 'mv' + data.id + '_' + Date.now().toString(),
-		name: '',
-		changedAt: null,
-		cleaned: false,
-		comment: '',
-		createdAt: today,
-		date: today,
-		image: null,
 		nkid: data.id, // mv?.id ?
-		species: ''
+		name: '',
+		date: today,
+		species: '',
+		comment: '',
+		image: null,
+		cleaned: false,
+		changedAt: null,
+		createdAt: today,
+		deletedAt: null
 	});
 
 	// Another effect hack: mv appears eventually, and only then do I want to init name, nkType etc.

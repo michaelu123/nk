@@ -112,6 +112,7 @@
 				latLng: [lat, lng],
 				ctrls: [],
 				selected: false,
+				color: 'red',
 				lastCleaned: null,
 				id,
 				name,
@@ -120,7 +121,7 @@
 				image: null,
 				createdAt: aufgehängtDate,
 				changedAt: null,
-				color: 'red'
+				deletedAt: null
 			});
 			await nkState.importMV(mv);
 			cnt++;
@@ -171,10 +172,11 @@
 					date,
 					species,
 					comment,
-					cleaned,
 					image: null,
+					cleaned,
 					createdAt: today,
-					changedAt: null
+					changedAt: null,
+					deletedAt: null
 				};
 				ctrlMap.set(key, ctrl);
 			}

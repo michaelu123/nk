@@ -19,6 +19,7 @@ export interface MarkerEntryProps {
 	image: string | null;
 	createdAt: Date | null;
 	changedAt: Date | null;
+	deletedAt: Date | null;
 }
 export class MarkerEntry implements MarkerEntryProps {
 	latLng: number[] = $state([]);
@@ -33,6 +34,7 @@ export class MarkerEntry implements MarkerEntryProps {
 	image: string | null = $state(null);
 	createdAt: Date | null = null;
 	changedAt: Date | null = null;
+	deletedAt: Date | null = null;
 
 	constructor(data: MarkerEntryProps) {
 		this.updateMarkerEntry(data);
@@ -49,6 +51,7 @@ export class MarkerEntry implements MarkerEntryProps {
 		this.image = data.image;
 		this.createdAt = data.createdAt;
 		this.changedAt = data.changedAt;
+		this.deletedAt = data.deletedAt;
 	}
 	toObj(): MarkerEntryProps {
 		let obj: MarkerEntryProps = {
@@ -63,7 +66,8 @@ export class MarkerEntry implements MarkerEntryProps {
 			comment: this.comment,
 			image: this.image,
 			createdAt: this.createdAt,
-			changedAt: this.changedAt
+			changedAt: this.changedAt,
+			deletedAt: this.deletedAt
 		};
 		return obj;
 	}
@@ -109,6 +113,7 @@ export interface ControlEntry {
 	cleaned: boolean;
 	createdAt: Date;
 	changedAt: Date | null;
+	deletedAt: Date | null;
 }
 type UpdatableControlFields = {
 	species: string | null;
@@ -217,29 +222,11 @@ export class State implements StateProps {
 		let keys = this.idb
 			? (await this.idb.getAllKeys('nk')).map((k) => k.toString())
 			: this.getLocalStorageKeys(true);
-		let oneSeen = false;
-		for (let key of keys) {
-			if (key.toString() == 'one') oneSeen = true;
-		}
-
-		// seed Markers
-		// if (!oneSeen) {
-		// 	for (let mv of markerVals) {
-		// 		const js = mv.mv2str();
-		// 		if (this.idb) {
-		// 			await this.idb.put('nk', js, mv.id);
-		// 		} else {
-		// 			localStorage.setItem(mv.id, js);
-		// 		}
-		// 	}
-		// 	keys = this.idb
-		// 		? (await this.idb!.getAllKeys('nk')).map((k) => k.toString())
-		// 		: this.getLocalStorageKeys(true);
-		// }
 
 		for (let key of keys) {
 			const val = this.idb ? await this.idb.get('nk', key) : localStorage.getItem(key);
 			const mv = new MarkerEntry(JSON.parse(val) as MarkerEntryProps);
+			if (mv.deletedAt) continue;
 			mvals.push(mv);
 			this.updNkTypes(mv.nkType);
 		}
@@ -301,6 +288,7 @@ export class State implements StateProps {
 		for (let key of keys) {
 			const val = this.idb ? await this.idb.get('kontrollen', key) : localStorage.getItem(key);
 			const ctrl = JSON.parse(val) as ControlEntry;
+			if (ctrl.deletedAt) continue;
 			ctrl.date = new Date(ctrl.date);
 			let mv = markerMap.get(ctrl.nkid);
 			if (mv) {
@@ -327,20 +315,25 @@ export class State implements StateProps {
 		const mv = this.markerValues[index];
 		const id = mv.id;
 		this.markerValues.splice(index, 1);
-		if (this.idb) {
-			await this.idb!.delete('nk', id);
-		} else {
-			localStorage.removeItem(id);
-		}
+		// if (this.idb) {
+		// 	await this.idb!.delete('nk', id);
+		// } else {
+		// 	localStorage.removeItem(id);
+		// }
+		const today = new Date();
+		mv.deletedAt = today;
+		this.persistNK(mv, {});
 		const image = mv.image;
 		if (this.rootDir && image) await removePath(this.rootDir, image);
 		for (const ctrl of mv.ctrls ?? []) {
-			if (this.idb) {
-				await this.idb.delete('kontrollen', ctrl.id);
-			} else {
-				localStorage.removeItem(ctrl.id);
-			}
+			// if (this.idb) {
+			// 	await this.idb.delete('kontrollen', ctrl.id);
+			// } else {
+			// 	localStorage.removeItem(ctrl.id);
+			// }
+			ctrl.deletedAt = today;
 			const image = ctrl.image;
+			this.persistCtrl(mv, ctrl, {});
 			if (this.rootDir && image) await removePath(this.rootDir, image);
 		}
 	}

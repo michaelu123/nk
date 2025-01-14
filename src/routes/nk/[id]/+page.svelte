@@ -58,7 +58,8 @@
 			comment: '',
 			image: null,
 			createdAt: today,
-			changedAt: null
+			changedAt: null,
+			deletedAt: null
 		});
 		return mv;
 	}
@@ -108,7 +109,8 @@
 					image: null,
 					cleaned: true,
 					createdAt: today,
-					changedAt: null
+					changedAt: null,
+					deletedAt: null
 				};
 				mv.ctrls = [ctrl];
 				nkState.persistCtrl(mv, ctrl, {});
@@ -130,6 +132,28 @@
 		goto('/photo?mvid=' + mv!.id);
 	}
 </script>
+
+{#snippet buttons(mv: MarkerEntry)}
+	<div class="mb-4 ml-4 mt-6 text-left">
+		{#if isEditMode}
+			<Button class="m-1" onclick={() => toggleEditModeAndSaveToDatabase(false)}>Speichern</Button>
+			{#if nknew}
+				<Button class="m-1" onclick={() => toggleEditModeAndSaveToDatabase(true)}
+					>Speichern und Bild aufnehmen</Button
+				>
+			{/if}
+			{#if mv.name && mv.nkType}
+				<Button class="m-1" onclick={setStateBack}>Nicht speichern</Button>
+				<Button class="m-1" onclick={goBack}>Zurück zur Karte</Button>
+				<Button class="m-1" onclick={takePhoto}>Neues Bild aufnehmen</Button>
+			{/if}
+		{:else}
+			<Button class="m-1" onclick={() => toggleEditModeAndSaveToDatabase(false)}>Ändern</Button>
+			<Button class="m-1" onclick={goBack}>Zurück zur Karte</Button>
+			<Button class="m-1" href={'/kontrolle/' + mv.id}>Neue Kontrolle</Button>
+		{/if}
+	</div>
+{/snippet}
 
 {#if mv}
 	<div id="details" class="overflow-x-clip">
@@ -174,6 +198,7 @@
 					</div>
 				{/if}
 			</form>
+			{@render buttons(mv)}
 		{:else}
 			<Card class="m-4" size="xl">
 				<div class="mb-4 flex">
@@ -194,29 +219,9 @@
 					<p class="w-40 shrink-0 font-bold">Bemerkungen</p>
 					<Textarea name="comment" id="comment_id" value={mv.comment} readonly rows={2}></Textarea>
 				</div>
+				{@render buttons(mv)}
 			</Card>
 		{/if}
-
-		<div class="mb-4 ml-4 mt-6 text-left">
-			{#if isEditMode}
-				<Button class="m-1" onclick={() => toggleEditModeAndSaveToDatabase(false)}>Speichern</Button
-				>
-				{#if nknew}
-					<Button class="m-1" onclick={() => toggleEditModeAndSaveToDatabase(true)}
-						>Speichern und Bild aufnehmen</Button
-					>
-				{/if}
-				{#if mv.name && mv.nkType}
-					<Button class="m-1" onclick={setStateBack}>Nicht speichern</Button>
-					<Button class="m-1" onclick={goBack}>Zurück zur Karte</Button>
-					<Button class="m-1" onclick={takePhoto}>Neues Bild aufnehmen</Button>
-				{/if}
-			{:else}
-				<Button class="m-1" onclick={() => toggleEditModeAndSaveToDatabase(false)}>Ändern</Button>
-				<Button class="m-1" onclick={goBack}>Zurück zur Karte</Button>
-				<Button class="m-1" href={'/kontrolle/' + mv.id}>Neue Kontrolle</Button>
-			{/if}
-		</div>
 
 		{#if !isEditMode && mv.ctrls}
 			<h1 class="m-4 text-lg font-bold">Kontrollen:</h1>

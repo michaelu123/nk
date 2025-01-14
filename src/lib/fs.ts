@@ -1,6 +1,7 @@
 export function getfs() {
+	window.requestFileSystem = window.requestFileSystem || window.webkitRequestFileSystem;
 	return new Promise<FileSystem>(function (resolve, reject) {
-		window.webkitRequestFileSystem(window.PERSISTENT, 1024 * 1024 * 1024 * 100, resolve, reject);
+		window.requestFileSystem(window.PERSISTENT, 1024 * 1024 * 1024 * 100, resolve, reject);
 	});
 }
 
