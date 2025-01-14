@@ -5,7 +5,7 @@
 	import { getState, MarkerEntry, type ControlEntry } from '$lib/state.svelte';
 	import { redirect, error } from '@sveltejs/kit';
 	import { Textarea, Label, Button, Input, Card, Checkbox, Spinner } from 'svelte-5-ui-lib';
-	import { getFile, toFile } from '$lib/fs.js';
+	import { fetchBlob, getFile, toFile } from '$lib/fs.js';
 
 	let nkState = getState();
 	let { nkTypes, nkSpecies, markerValues, isLoading } = $derived(nkState);
@@ -32,12 +32,9 @@
 
 	let cleaned = $state(true);
 
-	async function fetchImage() {
+	async function fetchImage(): Promise<string> {
 		if (mv && mv.image && data.rootDir) {
-			const fe = await getFile(data.rootDir, mv.image);
-			const f = await toFile(fe);
-			const blob = new Blob([f]);
-			return URL.createObjectURL(blob);
+			return fetchBlob(data.rootDir, mv.image);
 		}
 		return '';
 	}
@@ -102,7 +99,7 @@
 			if (nknew && cleaned) {
 				const today = new Date();
 				const ctrl: ControlEntry = {
-					id: Date.now().toString(),
+					id: 'mv' + mv.id + '_' + Date.now().toString(),
 					nkid: mv.id,
 					name: mv.name,
 					date: today,
@@ -217,6 +214,7 @@
 			{:else}
 				<Button class="m-1" onclick={() => toggleEditModeAndSaveToDatabase(false)}>Ändern</Button>
 				<Button class="m-1" onclick={goBack}>Zurück zur Karte</Button>
+				<Button class="m-1" href={'/kontrolle/' + mv.id}>Neue Kontrolle</Button>
 			{/if}
 		</div>
 

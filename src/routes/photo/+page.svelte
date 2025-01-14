@@ -4,6 +4,7 @@
 	import { getState } from '$lib/state.svelte';
 	import { redirect } from '@sveltejs/kit';
 	import { createDir, createFile, createWriter, writeFile, walkFS } from '$lib/fs.js';
+	import { goto } from '$app/navigation';
 
 	let width = $state(window.visualViewport?.width || 400);
 	let camera: EasyCamera;
@@ -11,18 +12,25 @@
 	let nkState = getState();
 	let { data } = $props();
 	let { rootDir } = data;
-	let id = data.url.searchParams.get('mvid') || '9230'; // TODO weg
-	if (!id) {
+	let mvid = data.url.searchParams.get('mvid');
+	let ctrlid = data.url.searchParams.get('ctrlid');
+	if (!mvid && !ctrlid) {
 		redirect(302, '/');
 	}
+	let id = ctrlid || mvid;
 
 	const takePhoto = async () => {
 		let blob = await camera.takePhoto();
 		console.log('blob', blob);
 		if (blob) {
-			let { path, total } = await writeImg(id, blob);
+			let { path, total } = await writeImg(id!, blob);
 			console.log('takePhoto', path, total);
-			nkState.addPhoto(id, path);
+			await nkState.addPhoto(mvid!, ctrlid, path);
+		}
+		if (ctrlid) {
+			goto('/nk/' + mvid);
+		} else {
+			history.back();
 		}
 	};
 

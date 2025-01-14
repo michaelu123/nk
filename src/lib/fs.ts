@@ -104,3 +104,10 @@ export async function walkFS(dir: FileSystemDirectoryEntry, indent: string) {
 		}
 	}
 }
+
+export async function fetchBlob(root: FileSystemDirectoryEntry, path: string) {
+	const fe = await getFile(root, path);
+	const f = await toFile(fe);
+	const blob = new Blob([f]);
+	return URL.createObjectURL(blob);
+}

@@ -405,6 +405,7 @@ export class State implements StateProps {
 			if (key == 'species') ctrl.species = updateObject.species!;
 			if (key == 'comment') ctrl.comment = updateObject.comment!;
 			if (key == 'cleaned') ctrl.cleaned = updateObject.cleaned!;
+			if (key == 'image') ctrl.image = updateObject.image!;
 		}
 		ctrl.changedAt = new Date();
 		await this.storeCtrl(ctrl);
@@ -438,13 +439,21 @@ export class State implements StateProps {
 		}
 	}
 
-	async addPhoto(id: string, path: string) {
-		const mv = this.markerValues.find((m) => m.id == id);
+	async addPhoto(mvid: string, ctrlid: string | null, path: string) {
+		const mv = this.markerValues.find((m) => m.id == mvid);
 		if (mv) {
+			if (ctrlid) {
+				const ctrl = mv.ctrls?.find((c) => c.id == ctrlid);
+				if (ctrl) {
+					this.persistCtrl(mv, ctrl, { image: path });
+				} else {
+					console.log(`cannot find ctrlid ${ctrlid} for marker ${mvid} and image in ${path}`);
+				}
+				return;
+			}
 			await this.persistNK(mv, { image: path });
-			mv.image = path;
 		} else {
-			console.log(`cannot find nkid ${id} for image in ${path}`);
+			console.log(`cannot find nkid ${mvid} for image in ${path}`);
 		}
 	}
 }

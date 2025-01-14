@@ -11,11 +11,11 @@
 	if (!data.id) {
 		redirect(302, '/');
 	}
-	let id = $derived(data.id);
-	let mv = $derived(markerValues.find((m) => m.id == id));
+	let mvid = $derived(data.id);
+	let mv = $derived(markerValues.find((m) => m.id == mvid));
 	let today = new Date();
 	let ctrl: ControlEntry = $state({
-		id: Date.now().toString(),
+		id: 'mv' + data.id + '_' + Date.now().toString(),
 		name: '',
 		changedAt: null,
 		cleaned: false,
@@ -38,7 +38,7 @@
 	});
 
 	function cb() {
-		goto('/nk/' + id);
+		goto('/nk/' + mvid);
 	}
 </script>
 
