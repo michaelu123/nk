@@ -4,9 +4,27 @@
 	import { getState, MarkerEntry } from '$lib/state.svelte';
 	import { goto } from '$app/navigation';
 
+	import {
+		Map as SVMap,
+		TileLayer,
+		Marker,
+		Popup,
+		Icon,
+		ControlZoom,
+		ControlAttribution,
+		Polygon,
+		Circle
+	} from 'sveaflet';
+	import { Button } from 'svelte-5-ui-lib';
+	import { walkFS, rmFS } from '$lib/fs';
+
+	import redMarker from '$lib/assets/redMarker.svg';
+	import greenMarker from '$lib/assets/greenMarker.svg';
+	import selectedMarker from '$lib/assets/yellowMarker.svg';
+
 	let nkState = getState();
 	let { data } = $props();
-	let { rootDir } = data;
+	let { rootDir, fetch } = data;
 
 	let { markerValues, maxBounds, defaultCenter, defaultZoom, isLoading } = $derived(nkState);
 
@@ -20,19 +38,6 @@
 		isSidebarOpen = sidebarUi.isOpen;
 		activeUrl = $page.url.pathname;
 	});
-
-	import {
-		Map as SVMap,
-		TileLayer,
-		Marker,
-		Popup,
-		Icon,
-		ControlZoom,
-		ControlAttribution,
-		Polygon,
-		Circle
-	} from 'sveaflet';
-	import { Button } from 'svelte-5-ui-lib';
 
 	let map: any = $state(null);
 	let centering = $state(false);
@@ -51,20 +56,16 @@
 		popupAnchor: [0, -30] // point from which the popup should open relative to the iconAnchor
 	};
 
-	import redMarker from '$lib/assets/redMarker.svg';
 	const redMarkerOptions = {
 		...commonIconOptions,
 		iconUrl: redMarker
 	};
 
-	import greenMarker from '$lib/assets/greenMarker.svg';
 	const greenMarkerOptions = {
 		...commonIconOptions,
 		iconUrl: greenMarker
 	};
 
-	import selectedMarker from '$lib/assets/yellowMarker.svg';
-	import { getFile, removePath, toFile, walkFS } from '$lib/fs';
 	const selectedMarkerOptions = {
 		...commonIconOptions,
 		iconUrl: selectedMarker
@@ -300,6 +301,48 @@
 			console.log('lsRe', e);
 		}
 	}
+
+	async function rmR() {
+		try {
+			await rmFS(rootDir!);
+		} catch (e) {
+			console.log('rmR', e);
+		}
+	}
+
+	async function postMarkers() {
+		const mvals = await nkState.fetchMarkersData(true); // including deleted items
+		await nkState.fetchCtrlsData(mvals, true);
+		for (const mv of mvals) {
+			let js = mv.mv2DBStr();
+			console.log('mvjs', js, mv.ctrls);
+			const response = await fetch!('/api/todb', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: js
+			});
+			console.log('resp', await response.json());
+
+			break;
+		}
+	}
+
+	// are milliseconds counted up by 1 or are there gaps?
+	function testclockres() {
+		const m = new Map<number, number>();
+		for (let i = 0; i < 100000; i++) {
+			const t = Date.now();
+			let e = m.get(t);
+			if (e) {
+				m.set(t, e + 1);
+			} else {
+				m.set(t, 1);
+			}
+		}
+		console.log('clockres', m);
+	}
 </script>
 
 {#snippet header()}
@@ -415,6 +458,9 @@
 			<SidebarItem label={followingGPS ? 'GPS nicht folgen' : 'GPS folgen'} onclick={followGPS}
 			></SidebarItem>
 			<SidebarItem label="ls-R" onclick={lsR}></SidebarItem>
+			<SidebarItem label="rm-R" onclick={rmR}></SidebarItem>
+			<SidebarItem label="postMarkers" onclick={postMarkers}></SidebarItem>
+			<SidebarItem label="testcr" onclick={testclockres}></SidebarItem>
 		</SidebarGroup>
 		<SidebarGroup border={true}>
 			<SidebarItem label="Dashboard" href="/"></SidebarItem>

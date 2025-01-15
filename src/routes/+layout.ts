@@ -99,12 +99,12 @@ async function getRootDir(): Promise<FileSystemDirectoryEntry | null> {
 	return null;
 }
 
-export const load: LayoutLoad = async ({ data, url }) => {
+export const load: LayoutLoad = async ({ data, url, fetch }) => {
 	console.log('+layout.ts', browser, url);
 	const { user } = data;
 	if (browser) {
 		let { idb, bucket } = await getStorage();
 		let rootDir = await getRootDir();
-		return { idb, bucket, user, rootDir };
+		return { idb, bucket, user, rootDir, fetch };
 	}
 };

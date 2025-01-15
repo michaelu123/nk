@@ -42,6 +42,12 @@ export function getFile(dir: FileSystemDirectoryEntry, path: string) {
 	});
 }
 
+export function removeRecursively(dir: FileSystemDirectoryEntry) {
+	return new Promise<void>(function (resolve, reject) {
+		dir.removeRecursively(resolve, reject);
+	});
+}
+
 export function createWriter(fe: FileEntry) {
 	return new Promise<FileWriter>(function (resolve, reject) {
 		fe.createWriter(resolve, reject);
@@ -102,6 +108,17 @@ export async function walkFS(dir: FileSystemDirectoryEntry, indent: string) {
 		} else {
 			const md = await getMetaData(fse);
 			console.log(indent + md.modificationTime + ',' + md.size);
+		}
+	}
+}
+
+export async function rmFS(root: FileSystemDirectoryEntry) {
+	let entries = await listEntries(root);
+	for (const fse of entries) {
+		if (fse.isDirectory) {
+			await removeRecursively(fse as FileSystemDirectoryEntry);
+		} else {
+			// how do we delete files below / ??
 		}
 	}
 }

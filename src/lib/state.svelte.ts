@@ -84,6 +84,18 @@ export class MarkerEntry implements MarkerEntryProps {
 		return js;
 	}
 
+	mv2DBStr() {
+		const obj = this.toObj();
+		obj.ctrls = $state.snapshot(this.ctrls);
+		const js = JSON.stringify(obj, (k, v) => {
+			if (k == 'selected') return undefined;
+			if (k == 'color') return undefined;
+			if (k == 'lastCleaned') return undefined;
+			return v;
+		});
+		return js;
+	}
+
 	setColor() {
 		let now = Date.now();
 		if (!this.lastCleaned) {
@@ -217,7 +229,7 @@ export class State implements StateProps {
 		}
 	}
 
-	async fetchMarkersData(): Promise<MarkerEntry[]> {
+	async fetchMarkersData(forSync: boolean): Promise<MarkerEntry[]> {
 		const mvals: MarkerEntry[] = [];
 		let keys = this.idb
 			? (await this.idb.getAllKeys('nk')).map((k) => k.toString())
@@ -226,7 +238,7 @@ export class State implements StateProps {
 		for (let key of keys) {
 			const val = this.idb ? await this.idb.get('nk', key) : localStorage.getItem(key);
 			const mv = new MarkerEntry(JSON.parse(val) as MarkerEntryProps);
-			if (mv.deletedAt) continue;
+			if (!forSync && mv.deletedAt) continue;
 			mvals.push(mv);
 			this.updNkTypes(mv.nkType);
 		}
@@ -249,8 +261,8 @@ export class State implements StateProps {
 			// await new Promise((r) => setTimeout(r, 2000));
 			await this.fetchOccData('nktypes');
 			await this.fetchOccData('nkspecies');
-			const mvals = await this.fetchMarkersData();
-			await this.fetchCtrlsData(mvals);
+			const mvals = await this.fetchMarkersData(false);
+			await this.fetchCtrlsData(mvals, false);
 			await this.fetchCenterData();
 			this.markerValues = mvals;
 		} finally {
@@ -277,7 +289,7 @@ export class State implements StateProps {
 		}
 	}
 
-	async fetchCtrlsData(mvals: MarkerEntry[]) {
+	async fetchCtrlsData(mvals: MarkerEntry[], forSync: boolean) {
 		const markerMap: Map<string, MarkerEntry> = new Map();
 		for (let mv of mvals) {
 			markerMap.set(mv.id, mv);
@@ -288,7 +300,7 @@ export class State implements StateProps {
 		for (let key of keys) {
 			const val = this.idb ? await this.idb.get('kontrollen', key) : localStorage.getItem(key);
 			const ctrl = JSON.parse(val) as ControlEntry;
-			if (ctrl.deletedAt) continue;
+			if (!forSync && ctrl.deletedAt) continue;
 			ctrl.date = new Date(ctrl.date);
 			let mv = markerMap.get(ctrl.nkid);
 			if (mv) {

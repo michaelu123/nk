@@ -98,7 +98,7 @@
 		const abgehängtIndex = headers.findIndex((h) => h === 'Abgehängt');
 		const today = new Date();
 		for (const r of records.slice(1)) {
-			const id = r[idIndex].toString(); // keep id, as good as any
+			const id = (r[idIndex] + 1000000000).toString(); // keep id for now, but make sure it can not be an id in the DB
 			const name = r[nameIndex].toString();
 			const typ = nbmap(r[typIndex]);
 			const comment = r[commentIndex];
@@ -150,7 +150,7 @@
 		let nowId = Date.now();
 		for (const r of records.slice(1)) {
 			const id = '';
-			const nkid = r[idIndex].toString();
+			const nkid = (r[idIndex] + 1000000000).toString();
 			const name = r[nameIndex].toString();
 			const datum = r[datumIndex]; // 27.12.2024
 			const date = datum2Date(datum);

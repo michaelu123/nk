@@ -3,7 +3,7 @@
 	import { Button } from 'svelte-5-ui-lib';
 	import { getState } from '$lib/state.svelte';
 	import { redirect } from '@sveltejs/kit';
-	import { createDir, createFile, createWriter, writeFile, walkFS } from '$lib/fs.js';
+	import { createDir, createFile, createWriter, writeFile } from '$lib/fs.js';
 	import { goto } from '$app/navigation';
 
 	let width = $state(window.visualViewport?.width || 400);
@@ -12,29 +12,27 @@
 	let nkState = getState();
 	let { data } = $props();
 	let { rootDir } = data;
+	let username = nkState.user?.username;
 	let mvid = data.url.searchParams.get('mvid');
 	let ctrlid = data.url.searchParams.get('ctrlid');
-	if (!mvid && !ctrlid) {
-		redirect(302, '/');
-	}
-	let id = ctrlid || mvid;
 
 	const takePhoto = async () => {
 		let blob = await camera.takePhoto();
+		let name = Date.now().toString();
 		console.log('blob', blob);
 		if (blob) {
-			let { path, total } = await writeImg(id!, blob);
+			let { path, total } = await writeImg(username!, name, blob);
 			console.log('takePhoto', path, total);
 			await nkState.addPhoto(mvid!, ctrlid, path);
 		}
-		if (ctrlid) {
-			goto('/nk/' + mvid);
-		} else {
-			history.back();
-		}
+		goto('/nk/' + mvid);
 	};
 
-	async function writeImg(name: string, blob: Blob): Promise<{ path: string; total: number }> {
+	async function writeImg(
+		username: string,
+		name: string,
+		blob: Blob
+	): Promise<{ path: string; total: number }> {
 		let now = new Date();
 		let year = now.getFullYear().toString();
 		let month = (now.getMonth() + 1).toString();
@@ -42,7 +40,8 @@
 		let ydir = await createDir(rootDir!, year);
 		let mdir = await createDir(ydir, month);
 		let ddir = await createDir(mdir, day);
-		let f = await createFile(ddir, name);
+		let udir = await createDir(ddir, username);
+		let f = await createFile(udir, name);
 		let path = f.fullPath;
 		let fw = await createWriter(f);
 		let total = await writeFile(fw, blob);
