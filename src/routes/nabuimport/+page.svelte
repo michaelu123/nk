@@ -80,7 +80,9 @@
 	}
 
 	function datum2Date(datum: string): Date {
-		const d = datum.slice(6, 10) + '-' + datum.slice(3, 5) + '-' + datum.slice(0, 2); // 27.12.2024
+		// 27.12.2024 -> 2024-12-27T12:00:00.000Z
+		const d =
+			datum.slice(6, 10) + '-' + datum.slice(3, 5) + '-' + datum.slice(0, 2) + 'T12:00:00.000Z';
 		return new Date(d);
 	}
 
@@ -97,6 +99,8 @@
 		const aufgehängtIndex = headers.findIndex((h) => h === 'Aufgehängt'); // 21.11.2023
 		const abgehängtIndex = headers.findIndex((h) => h === 'Abgehängt');
 		const today = new Date();
+		today.setMilliseconds(0);
+
 		for (const r of records.slice(1)) {
 			const id = (r[idIndex] + 1000000000).toString(); // keep id for now, but make sure it can not be an id in the DB
 			const name = r[nameIndex].toString();
@@ -145,6 +149,7 @@
 		// const hinweiseIndex = headers.findIndex((h) => h === 'Hinweise / Spuren / Erfassungstyp');
 
 		const today = new Date();
+		today.setMilliseconds(0);
 		const ctrlMap: Map<string, ControlEntry> = new Map();
 
 		let nowId = Date.now();

@@ -45,6 +45,8 @@
 		const lat = +latlng[0],
 			lng = +latlng[1];
 		const today = new Date();
+		today.setMilliseconds(0);
+
 		const id = today.valueOf().toString();
 		const mv = new MarkerEntry({
 			latLng: [lat, lng],
@@ -99,6 +101,7 @@
 			}
 			if (nknew && cleaned) {
 				const today = new Date();
+				today.setMilliseconds(0);
 				const ctrl: ControlEntry = {
 					id: 'mv' + mv.id + '_' + Date.now().toString(),
 					nkid: mv.id,
@@ -117,7 +120,7 @@
 			}
 			nkState.updNkTypes(nkType);
 			if (nknew && takePhoto) {
-				goto('/photo?mvid=' + mv.id);
+				goto(`/photo?mvid=${mv.id}&nkname=${mv.name}`);
 			} else {
 				goBack();
 			}
@@ -129,12 +132,12 @@
 		if (!name) errName = 'Bitte Namen vergeben';
 		if (!nkType) errType = 'Bitte Nistkastentyp vergeben';
 		if (!name || !nkType) return;
-		goto('/photo?mvid=' + mv!.id);
+		goto(`/photo?mvid=${mv!.id}&nkname=${mv!.name}`);
 	}
 </script>
 
 {#snippet buttons(mv: MarkerEntry)}
-	<div class="mb-4 ml-4 mt-6 text-left">
+	<div class="mb-1 ml-4 mt-0 text-left">
 		{#if isEditMode}
 			<Button class="m-1" onclick={() => toggleEditModeAndSaveToDatabase(false)}>Speichern</Button>
 			{#if nknew}
@@ -157,7 +160,7 @@
 
 {#if mv}
 	<div id="details" class="overflow-x-clip">
-		<h1 class="my-8 text-center text-2xl font-semibold">Nistkasten</h1>
+		<h1 class="my-1 text-center text-2xl font-semibold">Nistkasten</h1>
 		{#if !nknew}
 			<div class="m-1 flex items-center justify-center">
 				{#await imgUrl}
@@ -200,7 +203,7 @@
 			</form>
 			{@render buttons(mv)}
 		{:else}
-			<Card class="m-4" size="xl">
+			<Card class="m-1" size="xl">
 				<div class="mb-4 flex">
 					<p class="w-40 shrink-0 font-bold">Name</p>
 					<p>{mv.name}</p>
@@ -224,7 +227,7 @@
 		{/if}
 
 		{#if !isEditMode && mv.ctrls}
-			<h1 class="m-4 text-lg font-bold">Kontrollen:</h1>
+			<h1 class="m-2 text-lg font-bold">Kontrollen:</h1>
 			{#each mv.ctrls ?? [] as ctrl (ctrl.id)}
 				<NKControl {mv} {ctrl} {nkSpecies} cb={null} />
 			{/each}

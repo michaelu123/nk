@@ -12,32 +12,32 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	request.headers.forEach((v, k, p) => {
 		console.log('header', k, v);
 	});
-	const mv = (await request.json()) as MarkerEntryProps;
-	console.log('mv', mv);
+	const mvP = (await request.json()) as MarkerEntryProps;
+	console.log('mv', mvP);
 
-	const [mvdb] = await db.select().from(table.nk).where(eq(table.nk.id, +mv.id));
-	console.log('mvdb', mvdb);
+	const [mvDb] = await db.select().from(table.nk).where(eq(table.nk.id, +mvP.id));
+	console.log('mvDb', mvDb);
 
 	// case 1: marker not yet in the db, insert unless deleted
-	if (!mvdb) {
-		if (mv.deletedAt) {
+	if (!mvDb) {
+		if (mvP.deletedAt) {
 			// client can delete this entry
-			return json({ delete: mv.id }, { status: 200 });
+			return json({ delete: mvP.id }, { status: 200 });
 		}
-		const id = await mvinsert(mv, userId);
+		const id = await mvinsert(mvP, userId);
 		const ctrlIds: Object[] = [];
-		for (const ctrl of mv.ctrls || []) {
+		for (const ctrl of mvP.ctrls || []) {
 			if (ctrl.deletedAt) continue;
 			await ctrlinsert(id, ctrl, userId, ctrlIds);
 		}
 		// client must update id's
-		return json({ newid: id, oldid: mv.id, ctrls: ctrlIds }, { status: 200 });
+		return json({ newid: id, oldid: mvP.id, ctrls: ctrlIds }, { status: 200 });
 	}
 
 	// case 2: marker in the db, but deletedAt is set
-	if (mvdb && mv.deletedAt) {
-		await db.delete(table.nk).where(eq(table.nk.id, +mv.id));
-		return json({ delete: mv.id }, { status: 200 });
+	if (mvDb && mvP.deletedAt) {
+		await db.delete(table.nk).where(eq(table.nk.id, +mvP.id));
+		return json({ delete: mvP.id }, { status: 200 });
 	}
 
 	// case 3: marker in the db, must merge dependent on changedAt

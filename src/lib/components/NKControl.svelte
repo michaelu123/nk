@@ -45,7 +45,7 @@
 			}
 			await nkState.persistCtrl(mv, ctrl, { species: nkSpec, comment, cleaned });
 			if (takePhoto) {
-				goto(`/photo?mvid=${mv.id}&ctrlid=${ctrl.id}`);
+				goto(`/photo?mvid=${mv.id}&ctrlid=${ctrl.id}&nkname=${mv.name}`);
 			} else if (cb) {
 				cb();
 			}

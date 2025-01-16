@@ -11,16 +11,27 @@ export interface MarkerEntryProps {
 	ctrls: ControlEntry[] | null;
 	selected: boolean;
 	color: 'green' | 'red';
-	lastCleaned: Date | null;
+	lastCleaned: Date | string | null;
 	id: string;
 	name: string;
 	nkType: string;
 	comment: string;
 	image: string | null;
-	createdAt: Date | null;
-	changedAt: Date | null;
-	deletedAt: Date | null;
+	createdAt: Date | string | null;
+	changedAt: Date | string | null;
+	deletedAt: Date | string | null;
 }
+
+export function mv2DBStr(obj: MarkerEntryProps) {
+	const js = JSON.stringify(obj, (k, v) => {
+		if (k == 'selected') return undefined;
+		if (k == 'color') return undefined;
+		if (k == 'lastCleaned') return undefined;
+		return v;
+	});
+	return js;
+}
+
 export class MarkerEntry implements MarkerEntryProps {
 	latLng: number[] = $state([]);
 	ctrls: ControlEntry[] | null = $state(null);
@@ -39,6 +50,7 @@ export class MarkerEntry implements MarkerEntryProps {
 	constructor(data: MarkerEntryProps) {
 		this.updateMarkerEntry(data);
 	}
+
 	updateMarkerEntry(data: MarkerEntryProps) {
 		this.latLng = data.latLng;
 		this.ctrls = data.ctrls;
@@ -49,10 +61,11 @@ export class MarkerEntry implements MarkerEntryProps {
 		this.nkType = data.nkType;
 		this.comment = data.comment;
 		this.image = data.image;
-		this.createdAt = data.createdAt;
-		this.changedAt = data.changedAt;
-		this.deletedAt = data.deletedAt;
+		this.createdAt = typeof data.createdAt == 'string' ? new Date(data.createdAt) : data.createdAt;
+		this.changedAt = typeof data.changedAt == 'string' ? new Date(data.changedAt) : data.changedAt;
+		this.deletedAt = typeof data.deletedAt == 'string' ? new Date(data.deletedAt) : data.deletedAt;
 	}
+
 	toObj(): MarkerEntryProps {
 		let obj: MarkerEntryProps = {
 			latLng: this.latLng,
@@ -76,18 +89,6 @@ export class MarkerEntry implements MarkerEntryProps {
 		const obj = this.toObj();
 		const js = JSON.stringify(obj, (k, v) => {
 			if (k == 'ctrls') return undefined;
-			if (k == 'selected') return undefined;
-			if (k == 'color') return undefined;
-			if (k == 'lastCleaned') return undefined;
-			return v;
-		});
-		return js;
-	}
-
-	mv2DBStr() {
-		const obj = this.toObj();
-		obj.ctrls = $state.snapshot(this.ctrls);
-		const js = JSON.stringify(obj, (k, v) => {
 			if (k == 'selected') return undefined;
 			if (k == 'color') return undefined;
 			if (k == 'lastCleaned') return undefined;
@@ -123,9 +124,9 @@ export interface ControlEntry {
 	comment: string | null;
 	image: string | null;
 	cleaned: boolean;
-	createdAt: Date;
-	changedAt: Date | null;
-	deletedAt: Date | null;
+	createdAt: Date | string;
+	changedAt: Date | string | null;
+	deletedAt: Date | string | null;
 }
 type UpdatableControlFields = {
 	species: string | null;
@@ -229,7 +230,7 @@ export class State implements StateProps {
 		}
 	}
 
-	async fetchMarkersData(forSync: boolean): Promise<MarkerEntry[]> {
+	async fetchMarkersData(): Promise<MarkerEntry[]> {
 		const mvals: MarkerEntry[] = [];
 		let keys = this.idb
 			? (await this.idb.getAllKeys('nk')).map((k) => k.toString())
@@ -238,11 +239,46 @@ export class State implements StateProps {
 		for (let key of keys) {
 			const val = this.idb ? await this.idb.get('nk', key) : localStorage.getItem(key);
 			const mv = new MarkerEntry(JSON.parse(val) as MarkerEntryProps);
-			if (!forSync && mv.deletedAt) continue;
 			mvals.push(mv);
 			this.updNkTypes(mv.nkType);
 		}
 		return mvals;
+	}
+
+	async fetchMarkersProps(): Promise<MarkerEntryProps[]> {
+		const mvals: MarkerEntryProps[] = [];
+		let keys = this.idb
+			? (await this.idb.getAllKeys('nk')).map((k) => k.toString())
+			: this.getLocalStorageKeys(true);
+
+		for (let key of keys) {
+			const val = this.idb ? await this.idb.get('nk', key) : localStorage.getItem(key);
+			const mv = JSON.parse(val) as MarkerEntryProps;
+			mvals.push(mv);
+		}
+		return mvals;
+	}
+
+	async fetchCtrlsProps(mvals: MarkerEntryProps[]) {
+		const markerMap: Map<string, MarkerEntryProps> = new Map();
+		for (let mv of mvals) {
+			markerMap.set(mv.id, mv);
+		}
+		let keys = this.idb
+			? (await this.idb.getAllKeys('kontrollen')).map((k) => k.toString())
+			: this.getLocalStorageKeys(false);
+		for (let key of keys) {
+			const val = this.idb ? await this.idb.get('kontrollen', key) : localStorage.getItem(key);
+			const ctrl = JSON.parse(val) as ControlEntry;
+			ctrl.date = new Date(ctrl.date);
+			let mv = markerMap.get(ctrl.nkid);
+			if (mv) {
+				if (!mv.ctrls) mv.ctrls = [];
+				mv.ctrls.push(ctrl);
+			} else {
+				console.log('no marker for control ' + JSON.stringify(ctrl));
+			}
+		}
 	}
 
 	async fetchCenterData() {
@@ -261,7 +297,7 @@ export class State implements StateProps {
 			// await new Promise((r) => setTimeout(r, 2000));
 			await this.fetchOccData('nktypes');
 			await this.fetchOccData('nkspecies');
-			const mvals = await this.fetchMarkersData(false);
+			const mvals = await this.fetchMarkersData();
 			await this.fetchCtrlsData(mvals, false);
 			await this.fetchCenterData();
 			this.markerValues = mvals;
@@ -316,7 +352,7 @@ export class State implements StateProps {
 		}
 		for (let mv of mvals) {
 			mv.setColor();
-			if (mv.ctrls && mv.ctrls.length > 0) {
+			if (mv.ctrls && mv.ctrls.length > 1) {
 				mv.ctrls = mv.ctrls.toSorted((b, a) => a.date.valueOf() - b.date.valueOf());
 			}
 		}
@@ -333,6 +369,7 @@ export class State implements StateProps {
 		// 	localStorage.removeItem(id);
 		// }
 		const today = new Date();
+		today.setMilliseconds(0);
 		mv.deletedAt = today;
 		this.persistNK(mv, {});
 		const image = mv.image;
@@ -385,6 +422,8 @@ export class State implements StateProps {
 			if (key == 'comment') mv.comment = updateObject.comment!;
 		}
 		mv.changedAt = new Date();
+		mv.changedAt.setMilliseconds(0);
+
 		await this.storeMv(mv);
 	}
 
@@ -413,6 +452,8 @@ export class State implements StateProps {
 			if (key == 'image') ctrl.image = updateObject.image!;
 		}
 		ctrl.changedAt = new Date();
+		ctrl.changedAt.setMilliseconds(0);
+
 		await this.storeCtrl(ctrl);
 
 		mv.lastCleaned = null;

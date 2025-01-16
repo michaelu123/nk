@@ -2,7 +2,6 @@
 	import EasyCamera from '$lib/components/EasyCamera.svelte';
 	import { Button } from 'svelte-5-ui-lib';
 	import { getState } from '$lib/state.svelte';
-	import { redirect } from '@sveltejs/kit';
 	import { createDir, createFile, createWriter, writeFile } from '$lib/fs.js';
 	import { goto } from '$app/navigation';
 
@@ -15,33 +14,32 @@
 	let username = nkState.user?.username;
 	let mvid = data.url.searchParams.get('mvid');
 	let ctrlid = data.url.searchParams.get('ctrlid');
+	let nkName = data.url.searchParams.get('nkname');
 
 	const takePhoto = async () => {
 		let blob = await camera.takePhoto();
-		let name = Date.now().toString();
+		let msec = Date.now().toString();
 		console.log('blob', blob);
 		if (blob) {
-			let { path, total } = await writeImg(username!, name, blob);
+			let { path, total } = await writeImg(msec, blob);
 			console.log('takePhoto', path, total);
 			await nkState.addPhoto(mvid!, ctrlid, path);
 		}
 		goto('/nk/' + mvid);
 	};
 
-	async function writeImg(
-		username: string,
-		name: string,
-		blob: Blob
-	): Promise<{ path: string; total: number }> {
+	async function writeImg(msec: string, blob: Blob): Promise<{ path: string; total: number }> {
 		let now = new Date();
+		now.setMilliseconds(0);
+
 		let year = now.getFullYear().toString();
 		let month = (now.getMonth() + 1).toString();
 		let day = now.getDate().toString();
 		let ydir = await createDir(rootDir!, year);
 		let mdir = await createDir(ydir, month);
 		let ddir = await createDir(mdir, day);
-		let udir = await createDir(ddir, username);
-		let f = await createFile(udir, name);
+		let udir = await createDir(ddir, username!);
+		let f = await createFile(udir, nkName + '_' + msec);
 		let path = f.fullPath;
 		let fw = await createWriter(f);
 		let total = await writeFile(fw, blob);

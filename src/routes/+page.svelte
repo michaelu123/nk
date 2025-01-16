@@ -1,5 +1,12 @@
 <script lang="ts">
-	import { Sidebar, SidebarGroup, SidebarItem, SidebarButton, uiHelpers } from 'svelte-5-ui-lib';
+	import {
+		Sidebar,
+		SidebarGroup,
+		SidebarItem,
+		SidebarButton,
+		uiHelpers,
+		Progressbar
+	} from 'svelte-5-ui-lib';
 	import { page } from '$app/stores';
 	import { getState, MarkerEntry } from '$lib/state.svelte';
 	import { goto } from '$app/navigation';
@@ -21,6 +28,7 @@
 	import redMarker from '$lib/assets/redMarker.svg';
 	import greenMarker from '$lib/assets/greenMarker.svg';
 	import selectedMarker from '$lib/assets/yellowMarker.svg';
+	import { Sync } from '$lib/sync.js';
 
 	let nkState = getState();
 	let { data } = $props();
@@ -49,6 +57,7 @@
 	let radius = $state(100);
 	let followingGPS = $state(false);
 	let isGPSon = $state(false);
+	let progress = $state(0);
 
 	const commonIconOptions = {
 		iconSize: [40, 40], // size of the icon
@@ -300,6 +309,7 @@
 		} catch (e) {
 			console.log('lsRe', e);
 		}
+		isSidebarOpen = false;
 	}
 
 	async function rmR() {
@@ -308,40 +318,27 @@
 		} catch (e) {
 			console.log('rmR', e);
 		}
-	}
-
-	async function postMarkers() {
-		const mvals = await nkState.fetchMarkersData(true); // including deleted items
-		await nkState.fetchCtrlsData(mvals, true);
-		for (const mv of mvals) {
-			let js = mv.mv2DBStr();
-			console.log('mvjs', js, mv.ctrls);
-			const response = await fetch!('/api/todb', {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json'
-				},
-				body: js
-			});
-			console.log('resp', await response.json());
-
-			break;
-		}
+		isSidebarOpen = false;
 	}
 
 	// are milliseconds counted up by 1 or are there gaps?
-	function testclockres() {
-		const m = new Map<number, number>();
-		for (let i = 0; i < 100000; i++) {
-			const t = Date.now();
-			let e = m.get(t);
-			if (e) {
-				m.set(t, e + 1);
-			} else {
-				m.set(t, 1);
-			}
-		}
-		console.log('clockres', m);
+	// function testclockres() {
+	// 	const m = new Map<number, number>();
+	// 	for (let i = 0; i < 100000; i++) {
+	// 		const t = Date.now();
+	// 		let e = m.get(t);
+	// 		if (e) {
+	// 			m.set(t, e + 1);
+	// 		} else {
+	// 			m.set(t, 1);
+	// 		}
+	// 	}
+	// 	console.log('clockres', m);
+	// }
+
+	async function syncServer() {
+		const sy = new Sync(nkState, fetch!, (p: number) => (progress = p));
+		await sy.sync();
 	}
 </script>
 
@@ -459,8 +456,8 @@
 			></SidebarItem>
 			<SidebarItem label="ls-R" onclick={lsR}></SidebarItem>
 			<SidebarItem label="rm-R" onclick={rmR}></SidebarItem>
-			<SidebarItem label="postMarkers" onclick={postMarkers}></SidebarItem>
-			<SidebarItem label="testcr" onclick={testclockres}></SidebarItem>
+			<SidebarItem label="Server-sync" onclick={syncServer}></SidebarItem>
+			<!--SidebarItem label="testcr" onclick={testclockres}></SidebarItem-->
 		</SidebarGroup>
 		<SidebarGroup border={true}>
 			<SidebarItem label="Dashboard" href="/"></SidebarItem>
@@ -473,6 +470,11 @@
 
 {@render header()}
 <div class="relative">
+	{#if progress}
+		<div class="absolute left-10 top-1/3 z-[490] w-10/12">
+			<Progressbar {progress} labelOutside="Speicherfortschritt" size="h-6" />
+		</div>
+	{/if}
 	{@render sidebar()}
 	{@render svmap()}
 </div>

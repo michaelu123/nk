@@ -4,7 +4,9 @@ import type { PageLoad } from './$types';
 export const load: PageLoad = async ({ url }) => {
 	let mvid = url.searchParams.get('mvid');
 	let ctrlid = url.searchParams.get('ctrlid');
-	if (!mvid && !ctrlid) {
+	let nkName = url.searchParams.get('nkname');
+
+	if (!mvid || !nkName) {
 		return redirect(302, '/');
 	}
 

@@ -14,6 +14,7 @@
 	let mvid = $derived(data.id);
 	let mv = $derived(markerValues.find((m) => m.id == mvid));
 	let today = new Date();
+	today.setMilliseconds(0);
 	let ctrl: ControlEntry = $state({
 		id: 'mv' + data.id + '_' + Date.now().toString(),
 		nkid: data.id, // mv?.id ?
