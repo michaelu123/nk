@@ -219,7 +219,6 @@ export class State implements StateProps {
 			// seed occs
 			const occs = which == 'nktypes' ? nkDefaultTypes : nkDefaultSpecies;
 			const js = JSON.stringify(occs);
-			console.log('upd js', js, which);
 			if (this.idb) {
 				try {
 					await this.idb.put('settings', js, which);
@@ -318,8 +317,8 @@ export class State implements StateProps {
 		} finally {
 			this.isLoading = false;
 		}
-		console.log('nktypes', $state.snapshot(this.nkTypes));
-		console.log('nkspecs', $state.snapshot(this.nkSpecies));
+		// console.log('nktypes', $state.snapshot(this.nkTypes));
+		// console.log('nkspecs', $state.snapshot(this.nkSpecies));
 	}
 
 	async importMV(mv: MarkerEntry) {
@@ -331,7 +330,7 @@ export class State implements StateProps {
 		const js = ctrl2Str(ctrl);
 		if (this.idb) {
 			try {
-				await this.idb.put('kontrollen', js, ctrl.id);
+				await this.idb.put('kontrollen', js, ctrl.id.toString());
 			} catch (e: any) {
 				console.log('err idb.put', e);
 			}
@@ -408,7 +407,6 @@ export class State implements StateProps {
 		this.defaultCenter = center;
 		this.defaultZoom = zoom;
 		const js = JSON.stringify(this.defaultCenter);
-		console.log('upd js', js, 'center', center, 'dc', this.defaultCenter);
 		if (this.idb) {
 			await this.idb.put('settings', js, 'center');
 		} else {

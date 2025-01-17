@@ -1,23 +1,15 @@
 import type { ControlEntry, MarkerEntryProps } from '$lib/state.svelte';
 import { type RequestHandler, json } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
-import * as table from '$lib/server/db/schema';
+import * as nktables from '$lib/server/db/schema';
 import { eq } from 'drizzle-orm';
 import { defaultDate, type ServerChanges } from '$lib/sync';
 
-// let userId:string; // is this global or per session or request or what?
-
 export const POST: RequestHandler = async ({ request, locals }) => {
-	console.log('locals', locals, locals.user!.username, locals.user!.id);
-	const userId = locals.user!.id;
-	request.headers.forEach((v, k, p) => {
-		console.log('header', k, v);
-	});
+	const username = locals.user!.username;
 	const mvP = (await request.json()) as MarkerEntryProps;
-	console.log('mv', mvP);
 
-	const [mvDb] = await db.select().from(table.nk).where(eq(table.nk.id, +mvP.id));
-	console.log('mvDb', mvDb);
+	const [mvDb] = await db.select().from(nktables.nk).where(eq(nktables.nk.id, +mvP.id));
 
 	// case 1: marker not yet in the db, insert unless deleted
 	if (!mvDb) {
@@ -25,11 +17,11 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			// client can delete this entry
 			return json({ delete: mvP.id }, { status: 200 });
 		}
-		const id = await mvinsert(mvP, userId);
+		const id = await mvinsert(mvP, username);
 		const ctrlIds: Object[] = [];
 		for (const ctrl of mvP.ctrls || []) {
 			if (ctrl.deletedAt) continue;
-			await ctrlinsert(id, ctrl, userId, ctrlIds);
+			await ctrlinsert(id, ctrl, username, ctrlIds);
 		}
 		// client must update id's
 		return json({ newid: id, oldid: mvP.id, ctrls: ctrlIds }, { status: 200 });
@@ -37,7 +29,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
 	// case 2: marker in the db, but deletedAt is set
 	if (mvDb && mvP.deletedAt) {
-		await db.delete(table.nk).where(eq(table.nk.id, +mvP.id));
+		await db.delete(nktables.nk).where(eq(nktables.nk.id, +mvP.id));
 		return json({ delete: mvP.id }, { status: 200 });
 	}
 
@@ -46,35 +38,31 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	return json({ error: 'error' }, { status: 500 });
 };
 
-async function mvinsert(mv: MarkerEntryProps, userId: string): Promise<number> {
+async function mvinsert(mv: MarkerEntryProps, username: string): Promise<number> {
 	const data = mv2str(mv);
-	console.log('data', data);
-	console.log('mv', mv);
-	const values: table.NKDbInsert = {
-		userId,
+	const values: nktables.NKDbInsert = {
+		username,
 		data,
 		createdAt: mv.createdAt ? new Date(mv.createdAt) : null,
 		changedAt: mv.changedAt ? new Date(mv.changedAt) : null,
 		deletedAt: null
 	};
-	const newid = await db.insert(table.nk).values(values).$returningId();
+	const newid = await db.insert(nktables.nk).values(values).$returningId();
 	const id: number = newid[0].id;
 	return id;
 }
 
-async function ctrlinsert(nkId: number, ctrl: ControlEntry, userId: string, ctrlIds: Object[]) {
+async function ctrlinsert(nkid: number, ctrl: ControlEntry, username: string, ctrlIds: Object[]) {
 	const data = ctrl2str(ctrl);
-	console.log('data', data);
-	console.log('ctrl', ctrl);
-	const values: table.CtrlDbInsert = {
-		userId,
-		nkId,
+	const values: nktables.CtrlDbInsert = {
+		username,
+		nkid,
 		data,
 		createdAt: ctrl.createdAt ? new Date(ctrl.createdAt) : null,
 		changedAt: ctrl.changedAt ? new Date(ctrl.changedAt) : null,
 		deletedAt: null
 	};
-	const newid = await db.insert(table.kontrollen).values(values).$returningId();
+	const newid = await db.insert(nktables.kontrollen).values(values).$returningId();
 	const id: number = newid[0].id;
 	ctrlIds.push({ newid: id, oldid: ctrl.id });
 }
@@ -106,12 +94,18 @@ function ctrl2str(ctrl: ControlEntry): string {
 	return js;
 }
 
-export const GET: RequestHandler = async ({ request }) => {
+export const GET: RequestHandler = async () => {
 	let scMap = new Map<number, ServerChanges>();
 	let mchanges = await db
-		.select({ id: table.nk.id, createdAt: table.nk.createdAt, changedAt: table.nk.changedAt })
-		.from(table.nk);
+		.select({
+			id: nktables.nk.id,
+			createdAt: nktables.nk.createdAt,
+			changedAt: nktables.nk.changedAt,
+			deletedAt: nktables.nk.deletedAt
+		})
+		.from(nktables.nk);
 	for (const mchange of mchanges) {
+		if (mchange.deletedAt) continue;
 		let changedAt = mchange.changedAt;
 		if (changedAt == null) changedAt = mchange.createdAt;
 		const chgS = changedAt ? changedAt.toJSON() : defaultDate;
@@ -119,23 +113,25 @@ export const GET: RequestHandler = async ({ request }) => {
 	}
 	let cchanges = await db
 		.select({
-			id: table.kontrollen.id,
-			nkId: table.kontrollen.nkId,
-			createdAt: table.kontrollen.createdAt,
-			changedAt: table.kontrollen.changedAt
+			id: nktables.kontrollen.id,
+			nkid: nktables.kontrollen.nkid,
+			createdAt: nktables.kontrollen.createdAt,
+			changedAt: nktables.kontrollen.changedAt,
+			deletedAt: nktables.kontrollen.deletedAt
 		})
-		.from(table.kontrollen);
+		.from(nktables.kontrollen);
 	for (const cchange of cchanges) {
+		if (cchange.deletedAt) continue;
 		let changedAt = cchange.changedAt;
 		if (changedAt == null) changedAt = cchange.createdAt;
 		const chgS = changedAt ? changedAt.toJSON() : defaultDate;
-		const mchange = scMap.get(cchange.nkId);
+		const mchange = scMap.get(cchange.nkid);
 		if (mchange) {
 			mchange.ctrlChanges.push({ id: cchange.id, changedAt: chgS });
 		} else {
-			console.log(`unknown marker id ${cchange.nkId} for kontrolle with id ${cchange.id}`);
+			console.log(`unknown marker id ${cchange.nkid} for kontrolle with id ${cchange.id}`);
 		}
 	}
-	console.log('csMap', scMap);
-	return json(scMap.values().toArray());
+	if (scMap.size) return json(scMap.values().toArray());
+	return json([]);
 };

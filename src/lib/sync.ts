@@ -1,3 +1,4 @@
+import type { IDBPDatabase } from 'idb';
 import {
 	ctrl2Str,
 	mv2DBStr,
@@ -30,23 +31,25 @@ export class Sync {
 	private fetch: Function;
 	private setProgress: Function;
 	private mvalsP: MarkerEntryProps[] = [];
+	private idb: IDBPDatabase | null = null;
 
 	constructor(nkState: State, fetch: Function, setProgress: Function) {
 		this.nkState = nkState;
 		this.fetch = fetch;
 		this.setProgress = setProgress;
+		this.idb = nkState.idb;
 	}
 
 	async sync() {
 		const scMap = new Map<string, ServerChanges>(); // changedAt date of db entries
 		const csMap = new Map<string, ServerOrClient>(); // server: newer or new on server
-		const resp1 = await this.fetch('/api/db', {
+		const resp = await this.fetch('/api/db', {
 			method: 'GET',
 			headers: {
 				'Content-Type': 'application/json'
 			}
 		});
-		const serverChanges = (await resp1.json()) as ServerChanges[];
+		const serverChanges = (await resp.json()) as ServerChanges[];
 		for (let sc of serverChanges) {
 			const idS = sc.id.toString();
 			scMap.set(idS, sc);
@@ -80,8 +83,8 @@ export class Sync {
 	}
 
 	async storeOnServer(mvid: string) {
-		let mvP = this.mvalsP.find((m) => m.id == mvid)!;
-		let js = mv2DBStr(mvP, true);
+		const mvP = this.mvalsP.find((m) => m.id == mvid)!;
+		const js = mv2DBStr(mvP, true);
 		const response = await fetch!('/api/db', {
 			method: 'POST',
 			headers: {
@@ -90,12 +93,32 @@ export class Sync {
 			body: js
 		});
 		const idChanges = await response.json();
-		console.log('idChanges', idChanges);
 		await this.changeIds(mvP, idChanges);
 	}
 
 	async loadFromServer(mvid: string) {
-		// TODO
+		const resp = await this.fetch('/api/db/' + mvid, {
+			method: 'GET',
+			headers: {
+				'Content-Type': 'application/json'
+			}
+		});
+		const mvP = (await resp.json()) as MarkerEntryProps;
+		const js = mv2DBStr(mvP, false);
+		if (this.idb) {
+			try {
+				await this.idb.put('nk', js, mvP.id.toString());
+			} catch (e: any) {
+				console.log('err idb.put', e);
+			}
+		} else {
+			localStorage.setItem(mvP.id, js);
+		}
+		for (const ctrl of mvP.ctrls || []) {
+			ctrl.id = ctrl.id.toString();
+			ctrl.nkid = ctrl.nkid.toString();
+			this.nkState.storeCtrl(ctrl);
+		}
 	}
 
 	compareChanges(
@@ -192,7 +215,7 @@ export class Sync {
 	}
 
 	async changeIds(mvP: MarkerEntryProps, idChanges: any) {
-		if (this.nkState.idb) {
+		if (this.idb) {
 			await this.changeIdsIdb(mvP, idChanges);
 		} else {
 			this.changeIdsLs(mvP, idChanges);
@@ -200,7 +223,7 @@ export class Sync {
 	}
 
 	async changeIdsIdb(mvP: MarkerEntryProps, idChanges: any) {
-		const idb = this.nkState.idb!;
+		const idb = this.idb!;
 		const txnk = idb.transaction('nk', 'readwrite');
 		const store = txnk.objectStore('nk');
 		console.assert(
