@@ -22,11 +22,13 @@ export interface MarkerEntryProps {
 	deletedAt: Date | string | null;
 }
 
-export function mv2DBStr(obj: MarkerEntryProps) {
+export function mv2DBStr(obj: MarkerEntryProps, withCtrls: boolean) {
 	const js = JSON.stringify(obj, (k, v) => {
 		if (k == 'selected') return undefined;
 		if (k == 'color') return undefined;
 		if (k == 'lastCleaned') return undefined;
+		if (k == 'ctrls' && !withCtrls) return undefined;
+		if (k == 'id' && !withCtrls) return undefined;
 		return v;
 	});
 	return js;
@@ -128,6 +130,15 @@ export interface ControlEntry {
 	changedAt: Date | string | null;
 	deletedAt: Date | string | null;
 }
+
+export function ctrl2Str(ctrl: ControlEntry) {
+	const js = JSON.stringify(ctrl, (k, v) => {
+		if (k == 'id') return undefined;
+		return v;
+	});
+	return js;
+}
+
 type UpdatableControlFields = {
 	species: string | null;
 	comment: string | null;
@@ -239,6 +250,7 @@ export class State implements StateProps {
 		for (let key of keys) {
 			const val = this.idb ? await this.idb.get('nk', key) : localStorage.getItem(key);
 			const mv = new MarkerEntry(JSON.parse(val) as MarkerEntryProps);
+			mv.id = key;
 			mvals.push(mv);
 			this.updNkTypes(mv.nkType);
 		}
@@ -254,6 +266,7 @@ export class State implements StateProps {
 		for (let key of keys) {
 			const val = this.idb ? await this.idb.get('nk', key) : localStorage.getItem(key);
 			const mv = JSON.parse(val) as MarkerEntryProps;
+			mv.id = key;
 			mvals.push(mv);
 		}
 		return mvals;
@@ -270,6 +283,7 @@ export class State implements StateProps {
 		for (let key of keys) {
 			const val = this.idb ? await this.idb.get('kontrollen', key) : localStorage.getItem(key);
 			const ctrl = JSON.parse(val) as ControlEntry;
+			ctrl.id = key;
 			ctrl.date = new Date(ctrl.date);
 			let mv = markerMap.get(ctrl.nkid);
 			if (mv) {
@@ -312,8 +326,9 @@ export class State implements StateProps {
 		this.markerValues.push(mv);
 		await this.storeMv(mv);
 	}
-	async importCtrl(ctrl: ControlEntry) {
-		const js = JSON.stringify(ctrl);
+
+	async storeCtrl(ctrl: ControlEntry) {
+		const js = ctrl2Str(ctrl);
 		if (this.idb) {
 			try {
 				await this.idb.put('kontrollen', js, ctrl.id);
@@ -336,6 +351,7 @@ export class State implements StateProps {
 		for (let key of keys) {
 			const val = this.idb ? await this.idb.get('kontrollen', key) : localStorage.getItem(key);
 			const ctrl = JSON.parse(val) as ControlEntry;
+			ctrl.id = key;
 			if (!forSync && ctrl.deletedAt) continue;
 			ctrl.date = new Date(ctrl.date);
 			let mv = markerMap.get(ctrl.nkid);
@@ -425,19 +441,6 @@ export class State implements StateProps {
 		mv.changedAt.setMilliseconds(0);
 
 		await this.storeMv(mv);
-	}
-
-	async storeCtrl(ctrl: ControlEntry) {
-		const js = JSON.stringify(ctrl);
-		if (this.idb) {
-			try {
-				await this.idb.put('kontrollen', js, ctrl.id);
-			} catch (e: any) {
-				console.log('err idb.put', e);
-			}
-		} else {
-			localStorage.setItem('_k_' + ctrl.id, js);
-		}
 	}
 
 	async persistCtrl(

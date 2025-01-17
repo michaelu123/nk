@@ -198,7 +198,7 @@
 		}
 		for (const ctrl of ctrlMap.values()) {
 			ctrl.id = (nowId++).toString();
-			await nkState.importCtrl(ctrl);
+			await nkState.storeCtrl(ctrl);
 			cnt++;
 		}
 		await nkState.fetchData();
