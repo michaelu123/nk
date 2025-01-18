@@ -1,46 +1,53 @@
-import type { ControlEntry, MarkerEntryProps } from '$lib/state.svelte';
+import { type ControlEntry, type MarkerEntryProps } from '$lib/state.svelte';
 import { type RequestHandler, json } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
 import * as nktables from '$lib/server/db/schema';
-import { eq } from 'drizzle-orm';
-import { defaultDate, type ServerChanges } from '$lib/sync';
+import { eq, isNull } from 'drizzle-orm';
+import { type ServerChanges } from '$lib/sync';
+import type { CtrlDbInsert, CtrlDbSelect, NKDbInsert } from '$lib/server/db/schema';
+import { ctrl2Str, flattenObj, lastChanged, mv2DBStr } from '$lib/utils';
 
-export const POST: RequestHandler = async ({ request, locals }) => {
-	const username = locals.user!.username;
-	const mvP = (await request.json()) as MarkerEntryProps;
+function toNk(mvP: MarkerEntryProps, username: string): NKDbInsert {
+	return {
+		id: +mvP.id,
+		username,
+		data: mv2DBStr(mvP, false),
+		createdAt: mvP.createdAt ? new Date(mvP.createdAt) : null,
+		changedAt: mvP.changedAt ? new Date(mvP.changedAt) : null,
+		deletedAt: null
+	};
+}
 
-	const [mvDb] = await db.select().from(nktables.nk).where(eq(nktables.nk.id, +mvP.id));
+function toKontrollen(nkid: number, ctrl: ControlEntry, username: string): CtrlDbInsert {
+	return {
+		id: +ctrl.id,
+		nkid,
+		username,
+		data: ctrl2Str(ctrl, false),
+		createdAt: ctrl.createdAt ? new Date(ctrl.createdAt) : null,
+		changedAt: ctrl.changedAt ? new Date(ctrl.changedAt) : null,
+		deletedAt: null
+	};
+}
 
-	// case 1: marker not yet in the db, insert unless deleted
-	if (!mvDb) {
-		if (mvP.deletedAt) {
-			// client can delete this entry
-			return json({ delete: mvP.id }, { status: 200 });
-		}
-		const id = await mvinsert(mvP, username);
-		const ctrlIds: Object[] = [];
-		for (const ctrl of mvP.ctrls || []) {
-			if (ctrl.deletedAt) continue;
-			await ctrlinsert(id, ctrl, username, ctrlIds);
-		}
-		// client must update id's
-		return json({ newid: id, oldid: mvP.id, ctrls: ctrlIds }, { status: 200 });
+function findMvCtrl(mvP: MarkerEntryProps, id: string): ControlEntry | null {
+	const ctrls = mvP.ctrls || [];
+	for (const ctrl of ctrls) {
+		if (ctrl.id == id) return ctrl;
 	}
+	return null;
+}
 
-	// case 2: marker in the db, but deletedAt is set
-	if (mvDb && mvP.deletedAt) {
-		await db.delete(nktables.nk).where(eq(nktables.nk.id, +mvP.id));
-		return json({ delete: mvP.id }, { status: 200 });
+function findDbCtrl(dbctrls: CtrlDbSelect[], id: number): CtrlDbSelect | null {
+	for (const ctrl of dbctrls) {
+		if (ctrl.id == id) return ctrl;
 	}
-
-	// TODO case 3: marker in the db, must merge dependent on changedAt
-
-	return json({ error: 'error' }, { status: 500 });
-};
+	return null;
+}
 
 async function mvinsert(mv: MarkerEntryProps, username: string): Promise<number> {
 	const data = mv2str(mv);
-	const values: nktables.NKDbInsert = {
+	const values: NKDbInsert = {
 		username,
 		data,
 		createdAt: mv.createdAt ? new Date(mv.createdAt) : null,
@@ -53,8 +60,8 @@ async function mvinsert(mv: MarkerEntryProps, username: string): Promise<number>
 }
 
 async function ctrlinsert(nkid: number, ctrl: ControlEntry, username: string, ctrlIds: Object[]) {
-	const data = ctrl2str(ctrl);
-	const values: nktables.CtrlDbInsert = {
+	const data = ctrl2Str(ctrl, false);
+	const values: CtrlDbInsert = {
 		username,
 		nkid,
 		data,
@@ -82,19 +89,75 @@ function mv2str(mv: MarkerEntryProps): string {
 	return js;
 }
 
-function ctrl2str(ctrl: ControlEntry): string {
-	const js = JSON.stringify(ctrl, (k, v) => {
-		if (k == 'id') return undefined;
-		if (k == 'nkid') return undefined;
-		if (k == 'createdAt') return undefined;
-		if (k == 'changedAt') return undefined;
-		if (k == 'deletedAt') return undefined;
-		return v;
-	});
-	return js;
-}
+// the post handler gets a mv with ctrls and stores them into the DB if newer
+export const POST: RequestHandler = async ({ request, locals }) => {
+	const username = locals.user!.username;
+	const mvP = (await request.json()) as MarkerEntryProps;
 
-export const GET: RequestHandler = async () => {
+	const [mvDb] = await db.select().from(nktables.nk).where(eq(nktables.nk.id, +mvP.id));
+
+	// case 1: mv not yet in the db, insert unless deleted
+	if (!mvDb) {
+		if (mvP.deletedAt) {
+			// client can delete this entry
+			return json({ delete: { oldid: mvP.id } }, { status: 200 });
+		}
+		const id = await mvinsert(mvP, username);
+		const ctrlIds: Object[] = [];
+		for (const ctrl of mvP.ctrls || []) {
+			await ctrlinsert(id, ctrl, username, ctrlIds);
+		}
+		// client must update id's
+		return json({ updateids: { newid: id, oldid: mvP.id, ctrls: ctrlIds } }, { status: 200 });
+	}
+
+	// case 2: marker in the db, but deletedAt is set
+	// in the db mark as deleted
+	if (mvDb && mvP.deletedAt) {
+		const deletedAt = new Date(mvP.deletedAt);
+		await db
+			.update(nktables.kontrollen)
+			.set({ deletedAt })
+			.where(eq(nktables.kontrollen.nkid, +mvP.id));
+		await db.update(nktables.nk).set({ deletedAt }).where(eq(nktables.nk.id, +mvP.id));
+		return json({ delete: { oldid: mvP.id } }, { status: 200 });
+	}
+
+	// case 3: marker in the db, must merge dependent on changedAt
+	const dbChanged = lastChanged(mvDb);
+	const mvPChanged = lastChanged(mvP);
+	if (dbChanged < mvPChanged) {
+		await db.update(nktables.nk).set(toNk(mvP, username)).where(eq(nktables.nk.id, +mvP.id));
+	}
+
+	let dbCtrls = (await db
+		.select()
+		.from(nktables.kontrollen)
+		.where(eq(nktables.kontrollen.nkid, +mvP.id))) as CtrlDbSelect[];
+
+	for (const dbCtrl of dbCtrls) {
+		const mvCtrl = findMvCtrl(mvP, dbCtrl.id.toString());
+		if (!mvCtrl) continue;
+		const dbChanged = lastChanged(dbCtrl);
+		const mvChanged = lastChanged(mvCtrl);
+		if (dbChanged < mvChanged) {
+			await db
+				.update(nktables.kontrollen)
+				.set(toKontrollen(dbCtrl.id, mvCtrl, username))
+				.where(eq(nktables.kontrollen.id, dbCtrl.id));
+		}
+	}
+	const ctrlIds: Object[] = [];
+	for (const mvCtrl of mvP.ctrls || []) {
+		const dbCtrl = findDbCtrl(dbCtrls, +mvCtrl.id);
+		if (!dbCtrl) {
+			await ctrlinsert(mvDb.id, mvCtrl, username, ctrlIds);
+		}
+	}
+	return json({ updatectrlids: { ctrls: ctrlIds } }, { status: 200 });
+};
+
+async function getChgs(): Promise<Response> {
 	let scMap = new Map<number, ServerChanges>();
 	let mchanges = await db
 		.select({
@@ -105,11 +168,8 @@ export const GET: RequestHandler = async () => {
 		})
 		.from(nktables.nk);
 	for (const mchange of mchanges) {
-		if (mchange.deletedAt) continue;
-		let changedAt = mchange.changedAt;
-		if (changedAt == null) changedAt = mchange.createdAt;
-		const chgS = changedAt ? changedAt.toJSON() : defaultDate;
-		scMap.set(mchange.id, { id: mchange.id, changedAt: chgS, ctrlChanges: [] });
+		let lc = lastChanged(mchange);
+		scMap.set(mchange.id, { id: mchange.id, lastChanged: lc, ctrlChanges: [] });
 	}
 	let cchanges = await db
 		.select({
@@ -121,17 +181,47 @@ export const GET: RequestHandler = async () => {
 		})
 		.from(nktables.kontrollen);
 	for (const cchange of cchanges) {
-		if (cchange.deletedAt) continue;
-		let changedAt = cchange.changedAt;
-		if (changedAt == null) changedAt = cchange.createdAt;
-		const chgS = changedAt ? changedAt.toJSON() : defaultDate;
+		let lc = lastChanged(cchange);
 		const mchange = scMap.get(cchange.nkid);
 		if (mchange) {
-			mchange.ctrlChanges.push({ id: cchange.id, changedAt: chgS });
+			mchange.ctrlChanges.push({ id: cchange.id, lastChanged: lc });
 		} else {
 			console.log(`unknown marker id ${cchange.nkid} for kontrolle with id ${cchange.id}`);
 		}
 	}
 	if (scMap.size) return json(scMap.values().toArray());
+	return json([]);
+}
+
+async function getMvs(): Promise<Response> {
+	let mvalsDB = await db.select().from(nktables.nk).where(isNull(nktables.nk.deletedAt));
+	let mvalsP: MarkerEntryProps[] = [];
+	for (const mvdb of mvalsDB) {
+		const data = JSON.parse(mvdb.data as string);
+		mvdb.data = data;
+		const mvP = flattenObj(mvdb, {});
+		mvalsP.push(mvP);
+	}
+	return json(mvalsP);
+}
+
+async function getCtrls(): Promise<Response> {
+	let ctrlsDB = await db.select().from(nktables.kontrollen).where(isNull(nktables.nk.deletedAt));
+	let ctrls: ControlEntry[] = [];
+	for (const ctrlDB of ctrlsDB) {
+		const data = JSON.parse(ctrlDB.data as string);
+		ctrlDB.data = data;
+		const ctrl = flattenObj(ctrlDB, {});
+		ctrls.push(ctrl);
+	}
+	return json(ctrls);
+}
+
+// the get handler gets all change dates, or all mvs, or all ctrls
+export const GET: RequestHandler = async ({ url }) => {
+	const what = url.searchParams.get('what');
+	if (what == 'chg') return await getChgs();
+	if (what == 'nk') return await getMvs();
+	if (what == 'kn') return await getCtrls();
 	return json([]);
 };

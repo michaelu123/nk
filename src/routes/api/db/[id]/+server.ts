@@ -2,24 +2,7 @@ import { type RequestHandler, error, json } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
 import * as table from '$lib/server/db/schema';
 import { eq } from 'drizzle-orm';
-
-function flattenObj(obj: any, res: any) {
-	for (let key in obj) {
-		if (key == 'username') continue;
-		let val = obj[key];
-		if (!val || Array.isArray(val) || typeof val != 'object') {
-			res[key] = val;
-		} else {
-			if ('getYear' in val) {
-				val = val.toJSON();
-				res[key] = val;
-			} else {
-				flattenObj(val, res);
-			}
-		}
-	}
-	return res;
-}
+import { flattenObj } from '$lib/utils';
 
 export const GET: RequestHandler = async ({ params }) => {
 	const nkid = +params.id!;

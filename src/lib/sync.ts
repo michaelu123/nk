@@ -1,15 +1,10 @@
 import type { IDBPDatabase } from 'idb';
-import {
-	ctrl2Str,
-	mv2DBStr,
-	type ControlEntry,
-	type MarkerEntryProps,
-	type State
-} from './state.svelte';
+import { type ControlEntry, type MarkerEntryProps, type State } from './state.svelte';
+import { lastChanged, mv2DBStr } from './utils';
 
 interface IdAndChanged {
 	id: string;
-	changedAt: string;
+	lastChanged: string;
 }
 
 // who has newer data, server or client?
@@ -18,13 +13,12 @@ type ServerOrClient = 'client' | 'server' | 'none' | 'both';
 
 export interface ServerChanges {
 	id: number;
-	changedAt: string;
+	lastChanged: string;
 	ctrlChanges: {
 		id: number;
-		changedAt: string;
+		lastChanged: string;
 	}[];
 }
-export const defaultDate = '2000-01-01T12:00:00Z';
 
 export class Sync {
 	private nkState: State;
@@ -41,15 +35,15 @@ export class Sync {
 	}
 
 	async sync() {
-		const scMap = new Map<string, ServerChanges>(); // changedAt date of db entries
+		const scMap = new Map<string, ServerChanges>(); // lastChanged date of db entries
 		const csMap = new Map<string, ServerOrClient>(); // server: newer or new on server
-		const resp = await this.fetch('/api/db', {
+		const resp1 = await this.fetch('/api/db?what=chg', {
 			method: 'GET',
 			headers: {
 				'Content-Type': 'application/json'
 			}
 		});
-		const serverChanges = (await resp.json()) as ServerChanges[];
+		const serverChanges = (await resp1.json()) as ServerChanges[];
 		for (let sc of serverChanges) {
 			const idS = sc.id.toString();
 			scMap.set(idS, sc);
@@ -64,21 +58,73 @@ export class Sync {
 		}
 		csMap.forEach((v, k) => {
 			if (v == 'none') csMap.delete(k);
+			if (v == 'server') csMap.delete(k);
 		});
 		let len = csMap.size;
 		let index = 0;
 		for (const [mvid, sorc] of csMap.entries()) {
-			if (sorc == 'client') {
+			if (sorc == 'client' || sorc == 'both') {
 				await this.storeOnServer(mvid);
 			}
-			if (sorc == 'server') {
-				await this.loadFromServer(mvid);
-			}
+			// if (sorc == 'server') {
+			// 	await this.loadFromServer(mvid);
+			// }
 
 			index++;
-			const progress = (index / len) * 100;
+			const progress = (index / len) * 50;
 			this.setProgress(progress);
 		}
+
+		// clear local data
+		if (this.idb) {
+			await this.idb.clear('kontrollen');
+			await this.idb.clear('nk');
+		} else {
+			localStorage.clear();
+		}
+		// transfer DB to local data
+		const resp2 = await this.fetch('/api/db?what=nk', {
+			method: 'GET',
+			headers: {
+				'Content-Type': 'application/json'
+			}
+		});
+		const mvals = (await resp2.json()) as MarkerEntryProps[];
+
+		const resp3 = await this.fetch('/api/db?what=kn', {
+			method: 'GET',
+			headers: {
+				'Content-Type': 'application/json'
+			}
+		});
+		const ctrls = (await resp3.json()) as ControlEntry[];
+
+		len = mvals.length + ctrls.length;
+		index = 0;
+		for (const mvP of mvals) {
+			const js = mv2DBStr(mvP, false);
+			if (this.idb) {
+				try {
+					await this.idb.put('nk', js, mvP.id.toString());
+				} catch (e: any) {
+					console.log('err idb.put', e);
+				}
+			} else {
+				localStorage.setItem(mvP.id, js);
+			}
+			index++;
+			const progress = (index / len) * 50 + 50;
+			this.setProgress(progress);
+		}
+		for (const ctrl of ctrls) {
+			ctrl.id = ctrl.id.toString();
+			ctrl.nkid = ctrl.nkid.toString();
+			this.nkState.storeCtrl(ctrl);
+			index++;
+			const progress = (index / len) * 50 + 50;
+			this.setProgress(progress);
+		}
+		this.nkState.fetchData();
 		this.setProgress(0);
 	}
 
@@ -92,34 +138,34 @@ export class Sync {
 			},
 			body: js
 		});
-		const idChanges = await response.json();
-		await this.changeIds(mvP, idChanges);
+		// const idChanges = await response.json();
+		// await this.changeIds(mvP, idChanges);
 	}
 
-	async loadFromServer(mvid: string) {
-		const resp = await this.fetch('/api/db/' + mvid, {
-			method: 'GET',
-			headers: {
-				'Content-Type': 'application/json'
-			}
-		});
-		const mvP = (await resp.json()) as MarkerEntryProps;
-		const js = mv2DBStr(mvP, false);
-		if (this.idb) {
-			try {
-				await this.idb.put('nk', js, mvP.id.toString());
-			} catch (e: any) {
-				console.log('err idb.put', e);
-			}
-		} else {
-			localStorage.setItem(mvP.id, js);
-		}
-		for (const ctrl of mvP.ctrls || []) {
-			ctrl.id = ctrl.id.toString();
-			ctrl.nkid = ctrl.nkid.toString();
-			this.nkState.storeCtrl(ctrl);
-		}
-	}
+	// async loadFromServer(mvid: string) {
+	// 	const resp = await this.fetch('/api/db/' + mvid, {
+	// 		method: 'GET',
+	// 		headers: {
+	// 			'Content-Type': 'application/json'
+	// 		}
+	// 	});
+	// 	const mvP = (await resp.json()) as MarkerEntryProps;
+	// 	const js = mv2DBStr(mvP, false);
+	// 	if (this.idb) {
+	// 		try {
+	// 			await this.idb.put('nk', js, mvP.id.toString());
+	// 		} catch (e: any) {
+	// 			console.log('err idb.put', e);
+	// 		}
+	// 	} else {
+	// 		localStorage.setItem(mvP.id, js);
+	// 	}
+	// 	for (const ctrl of mvP.ctrls || []) {
+	// 		ctrl.id = ctrl.id.toString();
+	// 		ctrl.nkid = ctrl.nkid.toString();
+	// 		this.nkState.storeCtrl(ctrl);
+	// 	}
+	// }
 
 	compareChanges(
 		mvP: MarkerEntryProps,
@@ -127,24 +173,19 @@ export class Sync {
 	): 'client' | 'server' | 'none' | 'both' {
 		if (!sc) return 'client';
 
-		let mchangedAt = mvP.changedAt;
-		if (!mchangedAt) mchangedAt = mvP.createdAt;
-		if (!mchangedAt) mchangedAt = defaultDate;
-		const mchangedAtS = mchangedAt ? (mchangedAt as string) : defaultDate;
+		let lc = lastChanged(mvP);
 		const mics = this.convertControlEntriesToICArray(mvP.ctrls || []);
 		const sics = this.convertServerChangesControlEntries(sc.ctrlChanges);
-		if (mchangedAtS < sc.changedAt) return this.compareCtrlChanges(mics, sics, 'server');
-		if (mchangedAtS > sc.changedAt) return this.compareCtrlChanges(mics, sics, 'client');
+		if (lc < sc.lastChanged) return this.compareCtrlChanges(mics, sics, 'server');
+		if (lc > sc.lastChanged) return this.compareCtrlChanges(mics, sics, 'client');
 		return this.compareCtrlChanges(mics, sics, 'none');
 	}
 
 	convertControlEntriesToICArray(ctrls: ControlEntry[]): IdAndChanged[] {
 		let res: IdAndChanged[] = [];
 		for (const ctrl of ctrls || []) {
-			let changedAt = ctrl.changedAt;
-			if (!changedAt) changedAt = ctrl.createdAt;
-			const changedAtS = changedAt ? (changedAt as string) : defaultDate;
-			res.push({ id: ctrl.id, changedAt: changedAtS });
+			let lc = lastChanged(ctrl);
+			res.push({ id: ctrl.id, lastChanged: lc });
 		}
 		return res;
 	}
@@ -152,12 +193,12 @@ export class Sync {
 	convertServerChangesControlEntries(
 		ctrls: {
 			id: number;
-			changedAt: string;
+			lastChanged: string;
 		}[]
 	): IdAndChanged[] {
 		let res: IdAndChanged[] = [];
 		for (const ctrl of ctrls || []) {
-			res.push({ id: ctrl.id.toString(), changedAt: ctrl.changedAt });
+			res.push({ id: ctrl.id.toString(), lastChanged: ctrl.lastChanged });
 		}
 		return res;
 	}
@@ -171,10 +212,10 @@ export class Sync {
 			for (const se of s) {
 				if (me.id == se.id) {
 					foundMinS = true;
-					if (me.changedAt < se.changedAt) {
+					if (me.lastChanged < se.lastChanged) {
 						server = true;
 					}
-					if (me.changedAt > se.changedAt) {
+					if (me.lastChanged > se.lastChanged) {
 						client = true;
 					}
 					break;
@@ -187,10 +228,10 @@ export class Sync {
 			for (const me of m) {
 				if (se.id == me.id) {
 					foundSinM = true;
-					if (se.changedAt < me.changedAt) {
+					if (se.lastChanged < me.lastChanged) {
 						client = true;
 					}
-					if (se.changedAt > me.changedAt) {
+					if (se.lastChanged > me.lastChanged) {
 						server = true;
 					}
 					break;
@@ -206,15 +247,34 @@ export class Sync {
 		return msorc;
 	}
 
-	findNewId(idChanges: any, id: string): string | null {
-		const ctrls = idChanges.ctrls;
+	/* 
+	// instead of a fine grained update of local data from newer data in the db,
+	// we now just clear the local data and read the whole db 
+	findNewId(ctrls: any, id: string): string | null {
 		for (const ctrl of ctrls) {
-			if (ctrl.oldid == id) return ctrl.newid.toString();
+			if (ctrl.oldid == id) return ctrl.newid?.toString();
 		}
 		return null;
 	}
 
+	// The server responded to the POST /api/db with a mapping from old (local, client) ids
+	// to autogenerated server ids (see /routes/api/db/+server.ts). We must replace the
+	// local entries with entries containing the new ids.
 	async changeIds(mvP: MarkerEntryProps, idChanges: any) {
+		if (idChanges.delete) {
+			if (this.idb) {
+				await this.idb.delete('nk', mvP.id);
+				for (const ctrl of mvP.ctrls || []) {
+					await this.idb.delete('kontrollen', ctrl.id);
+				}
+			} else {
+				localStorage.removeItem(mvP.id);
+				for (const ctrl of mvP.ctrls || []) {
+					localStorage.removeItem('_k_' + ctrl.id);
+				}
+			}
+			return;
+		}
 		if (this.idb) {
 			await this.changeIdsIdb(mvP, idChanges);
 		} else {
@@ -224,50 +284,55 @@ export class Sync {
 
 	async changeIdsIdb(mvP: MarkerEntryProps, idChanges: any) {
 		const idb = this.idb!;
-		const txnk = idb.transaction('nk', 'readwrite');
-		const store = txnk.objectStore('nk');
-		console.assert(
-			mvP.id == idChanges.oldid.toString(),
-			`marker oldid ${mvP.id} != idchanges.oldid ${idChanges.oldid}`
-		);
-		await store.delete(mvP.id);
-		mvP.id = idChanges.newid.toString();
-		const js = mv2DBStr(mvP, false);
-		await store.put(js, mvP.id);
-		await txnk.done;
+		if (idChanges.updateids) {
+			console.assert(
+				mvP.id == idChanges.updateids.oldid,
+				`marker oldid ${mvP.id} != idchanges.oldid ${idChanges.updateids.oldid}`
+			);
+			const txnk = idb.transaction('nk', 'readwrite');
+			const store = txnk.objectStore('nk');
+			await store.delete(mvP.id);
+			mvP.id = idChanges.updateids.newid.toString();
+			const js = mv2DBStr(mvP, false);
+			await store.put(js, mvP.id);
+			await txnk.done;
+		}
+		const ctrlChanges = idChanges.updatectrlids?.ctrls || idChanges.updateids?.ctrls;
 		for (const ctrl of mvP.ctrls || []) {
-			const newid = this.findNewId(idChanges, ctrl.id);
-			console.assert(newid, `id ${ctrl.id} not found in ${idChanges}`);
+			const newid = this.findNewId(ctrlChanges, ctrl.id);
 			if (!newid) continue;
 			const ctrlnk = idb.transaction('kontrollen', 'readwrite');
 			const store = ctrlnk.objectStore('kontrollen');
 			await store.delete(ctrl.id);
 			ctrl.id = newid;
 			ctrl.nkid = mvP.id;
-			const js = ctrl2Str(ctrl);
+			const js = ctrl2Str(ctrl, true);
 			await store.put(js, newid);
 			await ctrlnk.done;
 		}
 	}
 
 	changeIdsLs(mvP: MarkerEntryProps, idChanges: any) {
-		console.assert(
-			mvP.id == idChanges.oldid.toString(),
-			`marker oldid ${mvP.id} != idchanges.oldid ${idChanges.oldid}`
-		);
-		localStorage.removeItem(mvP.id);
-		mvP.id = idChanges.newid.toString();
-		const js = mv2DBStr(mvP, false);
-		localStorage.setItem(mvP.id, js);
+		if (idChanges.updateids) {
+			console.assert(
+				mvP.id == idChanges.updateids.oldid.toString(),
+				`marker oldid ${mvP.id} != idchanges.oldid ${idChanges.updateids.oldid}`
+			);
+			localStorage.removeItem(mvP.id);
+			mvP.id = idChanges.updateids.newid.toString();
+			const js = mv2DBStr(mvP, false);
+			localStorage.setItem(mvP.id, js);
+		}
+		const ctrlChanges = idChanges.updatectrlids?.ctrls || idChanges.updateids?.ctrls;
 		for (const ctrl of mvP.ctrls || []) {
-			const newid = this.findNewId(idChanges, ctrl.id);
-			console.assert(newid, `id ${ctrl.id} not found in ${idChanges}`);
+			const newid = this.findNewId(ctrlChanges, ctrl.id);
 			if (!newid) continue;
 			localStorage.removeItem('_k_' + ctrl.id);
 			ctrl.id = newid;
 			ctrl.nkid = mvP.id;
-			const js = ctrl2Str(ctrl);
+			const js = ctrl2Str(ctrl, true);
 			localStorage.setItem(newid, js);
 		}
 	}
+	*/
 }

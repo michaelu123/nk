@@ -2,6 +2,7 @@ import { getContext, setContext } from 'svelte';
 import { nkDefaultTypes, nkDefaultSpecies } from './fakeDB';
 import type { IDBPDatabase } from 'idb';
 import { removePath } from './fs';
+import { ctrl2Str } from './utils';
 
 const MAX_DAYS = 100; // TODO configurable?
 const MAX_TIME_MS = MAX_DAYS * 24 * 60 * 60 * 1000;
@@ -20,18 +21,6 @@ export interface MarkerEntryProps {
 	createdAt: Date | string | null;
 	changedAt: Date | string | null;
 	deletedAt: Date | string | null;
-}
-
-export function mv2DBStr(obj: MarkerEntryProps, withCtrls: boolean) {
-	const js = JSON.stringify(obj, (k, v) => {
-		if (k == 'selected') return undefined;
-		if (k == 'color') return undefined;
-		if (k == 'lastCleaned') return undefined;
-		if (k == 'ctrls' && !withCtrls) return undefined;
-		if (k == 'id' && !withCtrls) return undefined;
-		return v;
-	});
-	return js;
 }
 
 export class MarkerEntry implements MarkerEntryProps {
@@ -129,14 +118,6 @@ export interface ControlEntry {
 	createdAt: Date | string;
 	changedAt: Date | string | null;
 	deletedAt: Date | string | null;
-}
-
-export function ctrl2Str(ctrl: ControlEntry) {
-	const js = JSON.stringify(ctrl, (k, v) => {
-		if (k == 'id') return undefined;
-		return v;
-	});
-	return js;
 }
 
 type UpdatableControlFields = {
@@ -327,7 +308,7 @@ export class State implements StateProps {
 	}
 
 	async storeCtrl(ctrl: ControlEntry) {
-		const js = ctrl2Str(ctrl);
+		const js = ctrl2Str(ctrl, true);
 		if (this.idb) {
 			try {
 				await this.idb.put('kontrollen', js, ctrl.id.toString());

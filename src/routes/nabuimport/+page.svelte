@@ -179,7 +179,7 @@
 					comment,
 					image: null,
 					cleaned,
-					createdAt: today,
+					createdAt: date,
 					changedAt: null,
 					deletedAt: null
 				};

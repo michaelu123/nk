@@ -41,6 +41,6 @@ export const kontrollen = mysqlTable('kontrollen', {
 });
 
 export type NKDbSelect = typeof nk.$inferSelect;
-export type CtrlDbSelect = typeof kontrollen.$inferSelect;
 export type NKDbInsert = typeof nk.$inferInsert;
+export type CtrlDbSelect = typeof kontrollen.$inferSelect;
 export type CtrlDbInsert = typeof kontrollen.$inferInsert;
