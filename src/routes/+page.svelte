@@ -342,13 +342,24 @@
 		const sy = new Sync(nkState, fetch!, (p: number) => (progress = p));
 		await sy.sync();
 	}
+
+	async function clearData() {
+		await rmR();
+		const sy = new Sync(nkState, fetch!, () => {});
+		await sy.clearDb();
+		await sy.removeDuplicates();
+		console.log('Ende clearData');
+		isSidebarOpen = false;
+	}
 </script>
 
 {#snippet header()}
 	<div class="sticky top-0 flex h-14 justify-start gap-4 bg-slate-100 p-2">
 		<SidebarButton onclick={sidebarUi.toggle} class="mb-2" breakpoint="md" />
 		<div class="w-full"></div>
-		<Button outline pill onclick={logmap}>?</Button>
+		{#if $page.url.hostname == 'localhost'}
+			<Button outline pill onclick={logmap}>?</Button>
+		{/if}
 		<Button outline pill onclick={addMarker}>+</Button>
 		<Button outline pill onclick={() => centerMap(currPos)}>{'\u2316'}</Button>
 		<!--Button outline pill onclick={toggleDL}>{'\u263E\u263C'}</Button-->
@@ -452,21 +463,24 @@
 		<SidebarGroup border={false}>
 			<SidebarItem label="Neues Zentrum" onclick={updDefaultCenter}></SidebarItem>
 			<SidebarItem label="Zum Zentrum" onclick={() => centerMap(defaultCenter)}></SidebarItem>
-			<SidebarItem label="Nabu-Import" href="/nabuimport"></SidebarItem>
 			<SidebarItem label={isGPSon ? 'GPS aus' : 'GPS ein'} onclick={posStart}></SidebarItem>
 			<SidebarItem label={followingGPS ? 'GPS nicht folgen' : 'GPS folgen'} onclick={followGPS}
 			></SidebarItem>
-			<SidebarItem label="ls-R" onclick={lsR}></SidebarItem>
-			<SidebarItem label="rm-R" onclick={rmR}></SidebarItem>
-			<SidebarItem label="Server-sync" onclick={syncServer}></SidebarItem>
+			<SidebarItem label="Daten sync" onclick={syncServer}></SidebarItem>
+			{#if $page.url.hostname == 'localhost' || $page.url.searchParams.get('more')}
+				<SidebarItem label="Nabu-Import" href="/nabuimport"></SidebarItem>
+				<SidebarItem label="ls-R" onclick={lsR}></SidebarItem>
+				<SidebarItem label="rm-R" onclick={rmR}></SidebarItem>
+				<SidebarItem label="Alles löschen" onclick={clearData}></SidebarItem>
+			{/if}
 			<!--SidebarItem label="testcr" onclick={testclockres}></SidebarItem-->
 		</SidebarGroup>
-		<SidebarGroup border={true}>
+		<!-- <SidebarGroup border={true}>
 			<SidebarItem label="Dashboard" href="/"></SidebarItem>
 			<SidebarItem label="Kanban" {spanClass} href="/"></SidebarItem>
 			<SidebarItem label="Inbox" {spanClass} href="/"></SidebarItem>
 			<SidebarItem label="Sidebar" href="/components/sidebar"></SidebarItem>
-		</SidebarGroup>
+		</SidebarGroup> -->
 	</Sidebar>
 {/snippet}
 

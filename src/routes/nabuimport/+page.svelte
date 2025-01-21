@@ -5,11 +5,14 @@
 	import { getState, type ControlEntry, MarkerEntry } from '$lib/state.svelte';
 	import { goto } from '$app/navigation';
 	import { Button } from 'svelte-5-ui-lib';
+	import { parse, HTMLElement } from 'node-html-parser';
 
 	let nkState = getState();
 	let isLoading = $state(false);
 	let errorMessage = $state('');
 	let cnt = $state(0);
+
+	let mapNameToImg = new Map<string, string>();
 
 	const nabuMap: Map<string, string> = new Map([
 		['NiKa (Nistkasten)', 'Nistkasten'],
@@ -56,6 +59,10 @@
 				isLoading = true;
 				const file = acceptedFiles[0] as File;
 				const str = await convertFileToText(file);
+				if (file.name.endsWith('.html')) {
+					parseHtml(str!);
+					return;
+				}
 				if (!str) {
 					errorMessage = 'no str??';
 					console.log('no str??');
@@ -112,6 +119,10 @@
 			const abgehängt = r[abgehängtIndex];
 			if (abgehängt) continue;
 			const aufgehängtDate = datum2Date(aufgehängt);
+			let image = mapNameToImg.get(name);
+			if (image) {
+				image = '/nabu/' + image;
+			}
 			const mv = new MarkerEntry({
 				latLng: [lat, lng],
 				ctrls: [],
@@ -122,7 +133,7 @@
 				name,
 				nkType: typ,
 				comment,
-				image: null,
+				image: image || null,
 				createdAt: aufgehängtDate,
 				changedAt: null,
 				deletedAt: null
@@ -203,13 +214,36 @@
 		}
 		await nkState.fetchData();
 	}
+
+	function parseHtml(str: string) {
+		const root = parse(str);
+		root.removeWhitespace();
+		console.log('root', root);
+		for (const c1 of root.childNodes) {
+			const img = (c1 as any as HTMLElement).getElementsByTagName('img');
+			// console.log('img', img[0].attributes);
+			const attributes = img[0].attributes;
+			// console.log('imgattr', attributes );
+			const src = attributes.src;
+			const name1 = (c1 as any as HTMLElement).getElementById('IWBS4BLOCKTEXT3');
+			const name2 = name1!.childNodes[0].innerText;
+			// console.log('name1', name1);
+			// console.log('name2', name2);
+			if (src.includes('Symbolbild')) continue;
+			mapNameToImg.set(name2, src.substring(36));
+		}
+		console.log('map', mapNameToImg);
+	}
 </script>
 
 <div class="m-4 h-max w-max">
 	{#if cnt}
 		<h1>Es wurden {cnt} Einträge importiert</h1>
 	{:else}
-		<h2 class="my-4 text-center text-xl">Wähle eine .csv-Datei, exportiert von der Nabu-App</h2>
+		<h2 class="my-4 text-center text-xl">
+			Wähle erst eine .csv-Datei für die Nistkästen, dann für die Kontrollen, exportiert von der
+			Nabu-App
+		</h2>
 		<div class="upload-area">
 			<div class="upload-container">
 				{#if errorMessage}
@@ -223,7 +257,12 @@
 						<p>CSV-Import wird verarbeitet</p>
 					</div>
 				{:else}
-					<Dropzone on:drop={handleDrop} multiple={false} accept="text/csv" maxSize={1000 * 1024}>
+					<Dropzone
+						on:drop={handleDrop}
+						multiple={false}
+						accept={['text/csv', 'text/html']}
+						maxSize={1000 * 1024}
+					>
 						<UploadOutline class="h-10 w-10" />
 						<p>Eine Datei hierher ziehen oder auswählen</p>
 					</Dropzone>

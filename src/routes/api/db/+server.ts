@@ -244,7 +244,6 @@ async function getImage(imgPath: string | null): Promise<Response> {
 		return json({ error: 'no imgPath provided' });
 	}
 	const filePath = join(IMAGE_ROOTDIR, imgPath);
-	console.log('filepath', filePath);
 	// does not work: return read(filePath); // https://sveltekit.io/blog/sveltekit-fs-read
 	const buf = await readFile(filePath);
 	const resp = new Response(buf, {
@@ -255,6 +254,50 @@ async function getImage(imgPath: string | null): Promise<Response> {
 	return resp;
 }
 
+async function nkDelete(id: number) {
+	await db.delete(nktables.kontrollen).where(eq(nktables.kontrollen.nkid, id));
+	await db.delete(nktables.nk).where(eq(nktables.nk.id, id));
+}
+
+async function removeDuplicates(): Promise<Response> {
+	let mvalArr: any = [];
+	let count = 0;
+	let mvals = await db
+		.select({
+			id: nktables.nk.id,
+			data: nktables.nk.data,
+			createdAt: nktables.nk.createdAt,
+			changedAt: nktables.nk.changedAt,
+			deletedAt: nktables.nk.deletedAt
+		})
+		.from(nktables.nk);
+	for (const mval of mvals) {
+		const data: any = JSON.parse(mval.data!);
+		let lc = lastChanged(mval);
+		mvalArr.push({ id: mval.id, lastChanged: lc, lat: data.latLng[0], lng: data.latLng[1] });
+	}
+	mvalArr = mvalArr.toSorted((a: any, b: any) => {
+		if (a.lat == b.lat) return a.lng - b.lng;
+		return a.lat - b.lat;
+	});
+	const len = mvalArr.length - 1;
+	for (let i = 0; i < len; i++) {
+		for (let j = i + 1; j < len; j++) {
+			if (mvalArr[i].lat == mvalArr[j].lat && mvalArr[i].lng == mvalArr[j].lng) {
+				await nkDelete(
+					mvalArr[i].lastChanged < mvalArr[j].lastChanged ? mvalArr[i].id : mvalArr[j].id
+				);
+				count++;
+			} else {
+				i = j;
+				break;
+			}
+		}
+	}
+	console.log('deleted duplicates', count);
+	return json({ count });
+}
+
 // the get handler gets all change dates, or all mvs, or all ctrls, or one image
 export const GET: RequestHandler = async ({ url }) => {
 	const what = url.searchParams.get('what');
@@ -262,6 +305,7 @@ export const GET: RequestHandler = async ({ url }) => {
 	if (what == 'nk') return await getMvs();
 	if (what == 'kn') return await getCtrls();
 	if (what == 'img') return await getImage(url.searchParams.get('imgPath'));
+	if (what == 'dpl') return await removeDuplicates();
 	return json([]);
 };
 

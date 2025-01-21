@@ -40,6 +40,8 @@ export class Sync {
 	private setProgress: Function;
 	private mvalsP: MarkerEntryProps[] = [];
 	private idb: IDBPDatabase | null = null;
+	private imgFromCnt = 0;
+	private imgToCnt = 0;
 
 	constructor(nkState: State, fetch: Function, setProgress: Function) {
 		this.nkState = nkState;
@@ -84,13 +86,12 @@ export class Sync {
 		});
 		let len = csMap.size;
 		let cnt = 0;
-		let toCnt = len;
-		let imgFromCnt = 0;
-		let imgToCnt = 0;
+		let toCnt = 0;
 		for (const [mvid, cmpRes] of csMap.entries()) {
 			const mvP = this.mvalsP.find((m) => m.id == mvid)!;
 			console.assert(mvP, 'cannot find NK data for nkid ' + mvid);
 			if (cmpRes.cmp & cmp_client) {
+				toCnt++;
 				await this.storeOnServer(mvP);
 			}
 			// if (cmpRes.cmp & cmp_server) { // instead we load everything from scratch
@@ -98,11 +99,9 @@ export class Sync {
 			// }
 			for (const image of cmpRes.imgToServer) {
 				await this.postImage(image);
-				imgToCnt++;
 			}
 			for (const image of cmpRes.imgFromServer) {
 				await this.fetchImageIfNotExists(image);
-				imgFromCnt++;
 			}
 			cnt++;
 			const progress = (cnt / len) * 100;
@@ -110,12 +109,8 @@ export class Sync {
 		}
 
 		// clear local data
-		if (this.idb) {
-			await this.idb.clear('kontrollen');
-			await this.idb.clear('nk');
-		} else {
-			localStorage.clear();
-		}
+		await this.clearDb();
+
 		// transfer DB to local data
 		const nkResponse = await this.fetch('/api/db?what=nk', {
 			method: 'GET',
@@ -165,8 +160,8 @@ export class Sync {
 Datensätze vom Server neu geholt: ${fromCnt}
 Davon Datensätze für Nistkästen: ${mvals.length}
 und für Kontrollen: ${ctrls.length}.
-Bilder zum Server übertragen: ${imgToCnt}
-Bilder vom Server geholt: ${imgFromCnt}
+Bilder zum Server übertragen: ${this.imgToCnt}
+Bilder vom Server geholt: ${this.imgFromCnt}
 `);
 	}
 
@@ -182,6 +177,7 @@ Bilder vom Server geholt: ${imgFromCnt}
 			});
 			const result = await response.json();
 			console.log('postimage res:', result);
+			this.imgToCnt++;
 		} catch (e) {
 			console.log(`cannot post image ${imgPath} to server: ${e}`);
 		}
@@ -189,13 +185,13 @@ Bilder vom Server geholt: ${imgFromCnt}
 
 	async fetchImageIfNotExists(imgPath: string) {
 		if (await existsFS(this.nkState.rootDir!, imgPath)) return;
-		const resp1: Response = await this.fetch('/api/db?what=img&imgPath=' + imgPath, {
-			method: 'GET',
-			headers: {
-				'Content-Type': 'application/octet-stream'
-			}
-		});
 		try {
+			const resp1: Response = await this.fetch('/api/db?what=img&imgPath=' + imgPath, {
+				method: 'GET',
+				headers: {
+					'Content-Type': 'application/octet-stream'
+				}
+			});
 			const buf = await resp1.arrayBuffer();
 			const blob = new Blob([buf]);
 			let dir = await createDirsFor(this.nkState.rootDir!, imgPath);
@@ -205,6 +201,7 @@ Bilder vom Server geholt: ${imgFromCnt}
 			let fw = await createWriter(f);
 			let total = await writeFile(fw, blob);
 			console.log(`wrote image ${imgPath} of length ${total}`);
+			this.imgFromCnt++;
 		} catch (e) {
 			console.log(`cannot get image ${imgPath} from server:${e}`);
 		}
@@ -337,6 +334,26 @@ Bilder vom Server geholt: ${imgFromCnt}
 			}
 		}
 		return cmp;
+	}
+
+	async clearDb() {
+		if (this.idb) {
+			await this.idb.clear('kontrollen');
+			await this.idb.clear('nk');
+		} else {
+			localStorage.clear();
+		}
+	}
+
+	async removeDuplicates() {
+		const dplResponse = await this.fetch('/api/db?what=dpl', {
+			method: 'GET',
+			headers: {
+				'Content-Type': 'application/json'
+			}
+		});
+		const js = await dplResponse.json();
+		console.log('Doubletten gelöscht:', js);
 	}
 
 	/* 

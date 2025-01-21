@@ -49,6 +49,7 @@
 		"leaflet": "^1.9.4",
 		"mysql2": "^3.11.0",
 		"sveaflet": "^0.1.0",
-		"svelte-file-dropzone": "^2.0.9"
+		"svelte-file-dropzone": "^2.0.9",
+		"node-html-parser": "^7.0.1"
 	}
 }
