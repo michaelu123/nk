@@ -6,6 +6,10 @@ import { eq, isNull } from 'drizzle-orm';
 import { type ServerChanges } from '$lib/sync';
 import type { CtrlDbInsert, CtrlDbSelect, NKDbInsert } from '$lib/server/db/schema';
 import { ctrl2Str, flattenObj, lastChanged, mv2DBStr } from '$lib/utils';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
+import { IMAGE_ROOTDIR } from '$env/static/private';
+// import { read } from '$app/server'; does not work
 
 function toNk(mvP: MarkerEntryProps, username: string): NKDbInsert {
 	return {
@@ -90,8 +94,7 @@ function mv2str(mv: MarkerEntryProps): string {
 }
 
 // the post handler gets a mv with ctrls and stores them into the DB if newer
-export const POST: RequestHandler = async ({ request, locals }) => {
-	const username = locals.user!.username;
+async function postMv(request: Request, username: string): Promise<Response> {
 	const mvP = (await request.json()) as MarkerEntryProps;
 
 	const [mvDb] = await db.select().from(nktables.nk).where(eq(nktables.nk.id, +mvP.id));
@@ -155,25 +158,40 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		}
 	}
 	return json({ updatectrlids: { ctrls: ctrlIds } }, { status: 200 });
-};
+}
+
+async function postImage(request: Request, imgPath: string | null) {
+	if (!imgPath) {
+		return json({ error: 'no imgPath provided' });
+	}
+	const buf = await request.arrayBuffer();
+	const dirPath = join(IMAGE_ROOTDIR, dirname(imgPath));
+	const filePath = join(IMAGE_ROOTDIR, imgPath);
+	await mkdir(dirPath, { recursive: true });
+	await writeFile(filePath, Buffer.from(buf), { flush: true });
+	return json({ ok: buf.byteLength });
+}
 
 async function getChgs(): Promise<Response> {
 	let scMap = new Map<number, ServerChanges>();
 	let mchanges = await db
 		.select({
 			id: nktables.nk.id,
+			data: nktables.nk.data,
 			createdAt: nktables.nk.createdAt,
 			changedAt: nktables.nk.changedAt,
 			deletedAt: nktables.nk.deletedAt
 		})
 		.from(nktables.nk);
 	for (const mchange of mchanges) {
+		const data = JSON.parse(mchange.data!);
 		let lc = lastChanged(mchange);
-		scMap.set(mchange.id, { id: mchange.id, lastChanged: lc, ctrlChanges: [] });
+		scMap.set(mchange.id, { id: mchange.id, lastChanged: lc, image: data.image, ctrlChanges: [] });
 	}
 	let cchanges = await db
 		.select({
 			id: nktables.kontrollen.id,
+			data: nktables.kontrollen.data,
 			nkid: nktables.kontrollen.nkid,
 			createdAt: nktables.kontrollen.createdAt,
 			changedAt: nktables.kontrollen.changedAt,
@@ -181,10 +199,11 @@ async function getChgs(): Promise<Response> {
 		})
 		.from(nktables.kontrollen);
 	for (const cchange of cchanges) {
+		const data = JSON.parse(cchange.data!);
 		let lc = lastChanged(cchange);
 		const mchange = scMap.get(cchange.nkid);
 		if (mchange) {
-			mchange.ctrlChanges.push({ id: cchange.id, lastChanged: lc });
+			mchange.ctrlChanges.push({ id: cchange.id, lastChanged: lc, image: data.image });
 		} else {
 			console.log(`unknown marker id ${cchange.nkid} for kontrolle with id ${cchange.id}`);
 		}
@@ -206,7 +225,10 @@ async function getMvs(): Promise<Response> {
 }
 
 async function getCtrls(): Promise<Response> {
-	let ctrlsDB = await db.select().from(nktables.kontrollen).where(isNull(nktables.nk.deletedAt));
+	let ctrlsDB = await db
+		.select()
+		.from(nktables.kontrollen)
+		.where(isNull(nktables.kontrollen.deletedAt));
 	let ctrls: ControlEntry[] = [];
 	for (const ctrlDB of ctrlsDB) {
 		const data = JSON.parse(ctrlDB.data as string);
@@ -217,11 +239,35 @@ async function getCtrls(): Promise<Response> {
 	return json(ctrls);
 }
 
-// the get handler gets all change dates, or all mvs, or all ctrls
+async function getImage(imgPath: string | null): Promise<Response> {
+	if (!imgPath) {
+		return json({ error: 'no imgPath provided' });
+	}
+	const filePath = join(IMAGE_ROOTDIR, imgPath);
+	console.log('filepath', filePath);
+	// does not work: return read(filePath); // https://sveltekit.io/blog/sveltekit-fs-read
+	const buf = await readFile(filePath);
+	const resp = new Response(buf, {
+		headers: {
+			'Content-Type': 'application/octet-stream'
+		}
+	});
+	return resp;
+}
+
+// the get handler gets all change dates, or all mvs, or all ctrls, or one image
 export const GET: RequestHandler = async ({ url }) => {
 	const what = url.searchParams.get('what');
 	if (what == 'chg') return await getChgs();
 	if (what == 'nk') return await getMvs();
 	if (what == 'kn') return await getCtrls();
+	if (what == 'img') return await getImage(url.searchParams.get('imgPath'));
+	return json([]);
+};
+
+export const POST: RequestHandler = async ({ url, request, locals }) => {
+	const what = url.searchParams.get('what');
+	if (what == 'nk') return await postMv(request, locals.user!.username);
+	if (what == 'img') return await postImage(request, url.searchParams.get('imgPath'));
 	return json([]);
 };

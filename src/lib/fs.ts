@@ -123,9 +123,36 @@ export async function rmFS(root: FileSystemDirectoryEntry) {
 	}
 }
 
-export async function fetchBlob(root: FileSystemDirectoryEntry, path: string) {
+export async function fetchBlob(root: FileSystemDirectoryEntry, path: string): Promise<Blob> {
 	const fe = await getFile(root, path);
 	const f = await toFile(fe);
 	const blob = new Blob([f]);
+	return blob;
+}
+
+export async function fetchBlobUrl(root: FileSystemDirectoryEntry, path: string): Promise<string> {
+	const blob = await fetchBlob(root, path);
 	return URL.createObjectURL(blob);
+}
+
+export async function existsFS(root: FileSystemDirectoryEntry, path: string): Promise<boolean> {
+	try {
+		await getFile(root, path);
+		return true;
+	} catch (e) {
+		return false;
+	}
+}
+
+export async function createDirsFor(
+	root: FileSystemDirectoryEntry,
+	path: string
+): Promise<FileSystemDirectoryEntry> {
+	const parts = path.split('/');
+	const len = parts.length - 1; // last part of path is a filename
+	let dir = root;
+	for (let i = 1; i < len; i++) {
+		dir = await createDir(dir, parts[i]);
+	}
+	return dir;
 }

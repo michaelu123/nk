@@ -1,22 +1,36 @@
 import type { IDBPDatabase } from 'idb';
 import { type ControlEntry, type MarkerEntryProps, type State } from './state.svelte';
-import { lastChanged, mv2DBStr } from './utils';
+import { lastChanged, mv2DBStr, sleep } from './utils';
+import { createDirsFor, createFile, createWriter, existsFS, fetchBlob, writeFile } from './fs';
 
 interface IdAndChanged {
 	id: string;
 	lastChanged: string;
+	image: string | null;
 }
 
 // who has newer data, server or client?
 // both occurs, if some new controls on both.
-type ServerOrClient = 'client' | 'server' | 'none' | 'both';
+const cmp_client = 1;
+const cmp_server = 2;
+const cmp_img_client = 4;
+const cmp_img_server = 8;
+type ServerOrClient = number; // bitwise OR of the above
+
+interface CmpResult {
+	cmp: ServerOrClient;
+	imgFromServer: string[];
+	imgToServer: string[];
+}
 
 export interface ServerChanges {
 	id: number;
 	lastChanged: string;
+	image: string | null;
 	ctrlChanges: {
 		id: number;
 		lastChanged: string;
+		image: string | null;
 	}[];
 }
 
@@ -36,42 +50,62 @@ export class Sync {
 
 	async sync() {
 		const scMap = new Map<string, ServerChanges>(); // lastChanged date of db entries
-		const csMap = new Map<string, ServerOrClient>(); // server: newer or new on server
-		const resp1 = await this.fetch('/api/db?what=chg', {
+		const csMap = new Map<string, CmpResult>(); // client: newer or new on client
+
+		const chgResponse = await this.fetch('/api/db?what=chg', {
 			method: 'GET',
 			headers: {
 				'Content-Type': 'application/json'
 			}
 		});
-		const serverChanges = (await resp1.json()) as ServerChanges[];
+		const serverChanges = (await chgResponse.json()) as ServerChanges[];
 		for (let sc of serverChanges) {
 			const idS = sc.id.toString();
 			scMap.set(idS, sc);
-			csMap.set(idS, 'server');
+			const imgFromServer: string[] = [];
+			if (sc.image) imgFromServer.push(sc.image);
+			for (const sctrl of sc.ctrlChanges) {
+				if (sctrl.image) imgFromServer.push(sctrl.image);
+			}
+			csMap.set(idS, { cmp: cmp_server, imgFromServer, imgToServer: [] });
 		}
+
 		this.mvalsP = await this.nkState.fetchMarkersProps(); // including deleted items
 		await this.nkState.fetchCtrlsProps(this.mvalsP);
 
 		for (let mvP of this.mvalsP) {
-			const cmp = this.compareChanges(mvP, scMap.get(mvP.id));
-			csMap.set(mvP.id, cmp); // may overwrite entries set to server above
+			const cmpRes = await this.compareChanges(mvP, scMap.get(mvP.id));
+			csMap.set(mvP.id, cmpRes); // may overwrite entries set to server above
 		}
 		csMap.forEach((v, k) => {
-			if (v == 'none') csMap.delete(k);
-			if (v == 'server') csMap.delete(k);
+			if (v.imgFromServer.length != 0 || v.imgToServer.length != 0) return;
+			if (v.cmp == 0) csMap.delete(k); // no differences, client and server same
+			if (v.cmp == cmp_server) csMap.delete(k); // bulk update later
 		});
 		let len = csMap.size;
-		let index = 0;
-		for (const [mvid, sorc] of csMap.entries()) {
-			if (sorc == 'client' || sorc == 'both') {
-				await this.storeOnServer(mvid);
+		let cnt = 0;
+		let toCnt = len;
+		let imgFromCnt = 0;
+		let imgToCnt = 0;
+		for (const [mvid, cmpRes] of csMap.entries()) {
+			const mvP = this.mvalsP.find((m) => m.id == mvid)!;
+			console.assert(mvP, 'cannot find NK data for nkid ' + mvid);
+			if (cmpRes.cmp & cmp_client) {
+				await this.storeOnServer(mvP);
 			}
-			// if (sorc == 'server') {
+			// if (cmpRes.cmp & cmp_server) { // instead we load everything from scratch
 			// 	await this.loadFromServer(mvid);
 			// }
-
-			index++;
-			const progress = (index / len) * 50;
+			for (const image of cmpRes.imgToServer) {
+				await this.postImage(image);
+				imgToCnt++;
+			}
+			for (const image of cmpRes.imgFromServer) {
+				await this.fetchImageIfNotExists(image);
+				imgFromCnt++;
+			}
+			cnt++;
+			const progress = (cnt / len) * 100;
 			this.setProgress(progress);
 		}
 
@@ -83,24 +117,24 @@ export class Sync {
 			localStorage.clear();
 		}
 		// transfer DB to local data
-		const resp2 = await this.fetch('/api/db?what=nk', {
+		const nkResponse = await this.fetch('/api/db?what=nk', {
 			method: 'GET',
 			headers: {
 				'Content-Type': 'application/json'
 			}
 		});
-		const mvals = (await resp2.json()) as MarkerEntryProps[];
-
-		const resp3 = await this.fetch('/api/db?what=kn', {
+		const mvals = (await nkResponse.json()) as MarkerEntryProps[];
+		const ctrlResponse = await this.fetch('/api/db?what=kn', {
 			method: 'GET',
 			headers: {
 				'Content-Type': 'application/json'
 			}
 		});
-		const ctrls = (await resp3.json()) as ControlEntry[];
+		const ctrls = (await ctrlResponse.json()) as ControlEntry[];
 
 		len = mvals.length + ctrls.length;
-		index = 0;
+		let fromCnt = len;
+		cnt = 0;
 		for (const mvP of mvals) {
 			const js = mv2DBStr(mvP, false);
 			if (this.idb) {
@@ -112,80 +146,125 @@ export class Sync {
 			} else {
 				localStorage.setItem(mvP.id, js);
 			}
-			index++;
-			const progress = (index / len) * 50 + 50;
+			cnt++;
+			const progress = (cnt / len) * 100;
 			this.setProgress(progress);
 		}
 		for (const ctrl of ctrls) {
 			ctrl.id = ctrl.id.toString();
 			ctrl.nkid = ctrl.nkid.toString();
 			this.nkState.storeCtrl(ctrl);
-			index++;
-			const progress = (index / len) * 50 + 50;
+			cnt++;
+			const progress = (cnt / len) * 100;
 			this.setProgress(progress);
 		}
 		this.nkState.fetchData();
 		this.setProgress(0);
+		await sleep(100);
+		alert(`Datensätze zum Server übertragen: ${toCnt}
+Datensätze vom Server neu geholt: ${fromCnt}
+Davon Datensätze für Nistkästen: ${mvals.length}
+und für Kontrollen: ${ctrls.length}.
+Bilder zum Server übertragen: ${imgToCnt}
+Bilder vom Server geholt: ${imgFromCnt}
+`);
 	}
 
-	async storeOnServer(mvid: string) {
-		const mvP = this.mvalsP.find((m) => m.id == mvid)!;
+	async postImage(imgPath: string) {
+		try {
+			const blob = await fetchBlob(this.nkState.rootDir!, imgPath);
+			const response = await fetch('/api/db?what=img&imgPath=' + imgPath, {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/octet-stream'
+				},
+				body: await blob.arrayBuffer()
+			});
+			const result = await response.json();
+			console.log('postimage res:', result);
+		} catch (e) {
+			console.log(`cannot post image ${imgPath} to server: ${e}`);
+		}
+	}
+
+	async fetchImageIfNotExists(imgPath: string) {
+		if (await existsFS(this.nkState.rootDir!, imgPath)) return;
+		const resp1: Response = await this.fetch('/api/db?what=img&imgPath=' + imgPath, {
+			method: 'GET',
+			headers: {
+				'Content-Type': 'application/octet-stream'
+			}
+		});
+		try {
+			const buf = await resp1.arrayBuffer();
+			const blob = new Blob([buf]);
+			let dir = await createDirsFor(this.nkState.rootDir!, imgPath);
+			const parts = imgPath.split('/');
+			let filename = parts[parts.length - 1];
+			let f = await createFile(dir, filename);
+			let fw = await createWriter(f);
+			let total = await writeFile(fw, blob);
+			console.log(`wrote image ${imgPath} of length ${total}`);
+		} catch (e) {
+			console.log(`cannot get image ${imgPath} from server:${e}`);
+		}
+	}
+
+	async storeOnServer(mvP: MarkerEntryProps) {
 		const js = mv2DBStr(mvP, true);
-		const response = await fetch!('/api/db', {
+		const response = await fetch!('/api/db?what=nk', {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/json'
 			},
 			body: js
 		});
+
 		// const idChanges = await response.json();
 		// await this.changeIds(mvP, idChanges);
 	}
 
-	// async loadFromServer(mvid: string) {
-	// 	const resp = await this.fetch('/api/db/' + mvid, {
-	// 		method: 'GET',
-	// 		headers: {
-	// 			'Content-Type': 'application/json'
-	// 		}
-	// 	});
-	// 	const mvP = (await resp.json()) as MarkerEntryProps;
-	// 	const js = mv2DBStr(mvP, false);
-	// 	if (this.idb) {
-	// 		try {
-	// 			await this.idb.put('nk', js, mvP.id.toString());
-	// 		} catch (e: any) {
-	// 			console.log('err idb.put', e);
-	// 		}
-	// 	} else {
-	// 		localStorage.setItem(mvP.id, js);
-	// 	}
-	// 	for (const ctrl of mvP.ctrls || []) {
-	// 		ctrl.id = ctrl.id.toString();
-	// 		ctrl.nkid = ctrl.nkid.toString();
-	// 		this.nkState.storeCtrl(ctrl);
-	// 	}
-	// }
+	async compareChanges(mvP: MarkerEntryProps, sc: ServerChanges | undefined): Promise<CmpResult> {
+		const imgFromServer: string[] = [];
+		const imgToServer: string[] = [];
+		let cmp = 0;
+		if (mvP.id == '240') {
+			console.log('240'); // TODO
+		}
 
-	compareChanges(
-		mvP: MarkerEntryProps,
-		sc: ServerChanges | undefined
-	): 'client' | 'server' | 'none' | 'both' {
-		if (!sc) return 'client';
+		if (!sc) {
+			if (mvP.image) imgToServer.push(mvP.image);
+			for (const ctrl of mvP.ctrls || []) {
+				if (ctrl.image) imgToServer.push(ctrl.image);
+			}
+			return { cmp: cmp_client, imgFromServer, imgToServer };
+		}
 
-		let lc = lastChanged(mvP);
-		const mics = this.convertControlEntriesToICArray(mvP.ctrls || []);
+		if (mvP.image && (!sc.image || sc.image != mvP.image)) {
+			imgToServer.push(mvP.image);
+		}
+		if (sc.image && !(await existsFS(this.nkState.rootDir!, sc.image))) {
+			imgFromServer.push(sc.image);
+		}
+
+		const cics = this.convertControlEntriesToICArray(mvP.ctrls || []);
 		const sics = this.convertServerChangesControlEntries(sc.ctrlChanges);
-		if (lc < sc.lastChanged) return this.compareCtrlChanges(mics, sics, 'server');
-		if (lc > sc.lastChanged) return this.compareCtrlChanges(mics, sics, 'client');
-		return this.compareCtrlChanges(mics, sics, 'none');
+		let lc = lastChanged(mvP);
+		if (lc < sc.lastChanged) {
+			cmp = await this.compareCtrlChanges(cics, sics, cmp_server, imgFromServer, imgToServer);
+		} else if (lc > sc.lastChanged) {
+			cmp = await this.compareCtrlChanges(cics, sics, cmp_client, imgFromServer, imgToServer);
+		} else {
+			cmp = await this.compareCtrlChanges(cics, sics, 0, imgFromServer, imgToServer);
+		}
+		return { cmp, imgFromServer, imgToServer };
 	}
 
 	convertControlEntriesToICArray(ctrls: ControlEntry[]): IdAndChanged[] {
 		let res: IdAndChanged[] = [];
 		for (const ctrl of ctrls || []) {
 			let lc = lastChanged(ctrl);
-			res.push({ id: ctrl.id, lastChanged: lc });
+			res.push({ id: ctrl.id, lastChanged: lc, image: ctrl.image });
 		}
 		return res;
 	}
@@ -194,57 +273,70 @@ export class Sync {
 		ctrls: {
 			id: number;
 			lastChanged: string;
+			image: string | null;
 		}[]
 	): IdAndChanged[] {
 		let res: IdAndChanged[] = [];
 		for (const ctrl of ctrls || []) {
-			res.push({ id: ctrl.id.toString(), lastChanged: ctrl.lastChanged });
+			res.push({ id: ctrl.id.toString(), lastChanged: ctrl.lastChanged, image: ctrl.image });
 		}
 		return res;
 	}
 
-	compareCtrlChanges(m: IdAndChanged[], s: IdAndChanged[], msorc: ServerOrClient): ServerOrClient {
-		let server = false;
-		let client = false;
-
-		for (const me of m) {
-			let foundMinS = false;
+	async compareCtrlChanges(
+		c: IdAndChanged[],
+		s: IdAndChanged[],
+		cmp: number,
+		imgFromServer: string[],
+		imgToServer: string[]
+	): Promise<ServerOrClient> {
+		for (const ce of c) {
+			let foundCinS = false;
 			for (const se of s) {
-				if (me.id == se.id) {
-					foundMinS = true;
-					if (me.lastChanged < se.lastChanged) {
-						server = true;
+				if (ce.id == se.id) {
+					foundCinS = true;
+					if (ce.image && (!se.image || se.image != ce.image)) {
+						imgToServer.push(ce.image);
 					}
-					if (me.lastChanged > se.lastChanged) {
-						client = true;
+					if (se.image && !(await existsFS(this.nkState.rootDir!, se.image))) {
+						imgFromServer.push(se.image);
+					}
+					if (ce.lastChanged < se.lastChanged) {
+						cmp |= cmp_server;
+					}
+					if (ce.lastChanged > se.lastChanged) {
+						cmp |= cmp_client;
 					}
 					break;
 				}
 			}
-			if (!foundMinS) client = true; // client has a control that server does not or is newer
+			if (!foundCinS) {
+				cmp |= cmp_client; // client has a control that server does not or is newer
+				if (ce.image) {
+					if (await existsFS(this.nkState.rootDir!, ce.image)) {
+						imgToServer.push(ce.image);
+					} else {
+						imgFromServer.push(ce.image);
+					}
+				}
+			}
 		}
 		for (const se of s) {
-			let foundSinM = false;
-			for (const me of m) {
-				if (se.id == me.id) {
-					foundSinM = true;
-					if (se.lastChanged < me.lastChanged) {
-						client = true;
-					}
-					if (se.lastChanged > me.lastChanged) {
-						server = true;
-					}
+			let foundSinC = false;
+			for (const ce of c) {
+				if (se.id == ce.id) {
+					foundSinC = true;
 					break;
 				}
 			}
-			if (!foundSinM) server = true; // server has a control that client does not or is newer
+			if (!foundSinC) {
+				cmp |= cmp_server; // server has a control that client does not or is newer
+				if (se.image) {
+					imgFromServer.push(se.image);
+				}
+			}
 		}
-		if (server && client) return 'both';
-		if (server && msorc == 'client') return 'both';
-		if (client && msorc == 'server') return 'both';
-		if (server) return 'server';
-		if (client) return 'client';
-		return msorc;
+		return cmp;
 	}
 
 	/* 
@@ -332,6 +424,31 @@ export class Sync {
 			ctrl.nkid = mvP.id;
 			const js = ctrl2Str(ctrl, true);
 			localStorage.setItem(newid, js);
+		}
+	}
+
+	async loadFromServer(mvid: string) {
+		const resp = await this.fetch('/api/db/' + mvid, {
+			method: 'GET',
+			headers: {
+				'Content-Type': 'application/json'
+			}
+		});
+		const mvP = (await resp.json()) as MarkerEntryProps;
+		const js = mv2DBStr(mvP, false);
+		if (this.idb) {
+			try {
+				await this.idb.put('nk', js, mvP.id.toString());
+			} catch (e: any) {
+				console.log('err idb.put', e);
+			}
+		} else {
+			localStorage.setItem(mvP.id, js);
+		}
+		for (const ctrl of mvP.ctrls || []) {
+			ctrl.id = ctrl.id.toString();
+			ctrl.nkid = ctrl.nkid.toString();
+			this.nkState.storeCtrl(ctrl);
 		}
 	}
 	*/

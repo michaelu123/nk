@@ -50,3 +50,7 @@ export function lastChanged(o: any): string {
 	if (typeof lc != 'string') lc = lc.toJSON();
 	return lc;
 }
+
+export function sleep(ms: number) {
+	return new Promise((resolve) => setTimeout(resolve, ms));
+}

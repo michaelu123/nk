@@ -5,7 +5,7 @@
 	import { getState, MarkerEntry, type ControlEntry } from '$lib/state.svelte';
 	import { redirect, error } from '@sveltejs/kit';
 	import { Textarea, Label, Button, Input, Card, Checkbox, Spinner } from 'svelte-5-ui-lib';
-	import { fetchBlob, getFile, toFile } from '$lib/fs.js';
+	import { fetchBlobUrl } from '$lib/fs.js';
 
 	let nkState = getState();
 	let { nkTypes, nkSpecies, markerValues, isLoading } = $derived(nkState);
@@ -34,7 +34,7 @@
 
 	async function fetchImage(): Promise<string> {
 		if (mv && mv.image && data.rootDir) {
-			return fetchBlob(data.rootDir, mv.image);
+			return await fetchBlobUrl(data.rootDir, mv.image);
 		}
 		return '';
 	}

@@ -4,7 +4,7 @@
 	import { getState } from '$lib/state.svelte';
 	import ProposedInput from './ProposedInput.svelte';
 	import { goto } from '$app/navigation';
-	import { fetchBlob } from '$lib/fs';
+	import { fetchBlobUrl } from '$lib/fs';
 
 	interface Props {
 		ctrl: ControlEntry;
@@ -26,7 +26,7 @@
 
 	async function fetchImage(): Promise<string> {
 		if (showImage && ctrl && ctrl.image && nkState.rootDir) {
-			return fetchBlob(nkState.rootDir, ctrl.image);
+			return await fetchBlobUrl(nkState.rootDir, ctrl.image);
 		}
 		return '';
 	}

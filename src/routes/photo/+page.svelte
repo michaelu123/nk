@@ -39,7 +39,7 @@
 		let mdir = await createDir(ydir, month);
 		let ddir = await createDir(mdir, day);
 		let udir = await createDir(ddir, username!);
-		let f = await createFile(udir, nkName + '_' + msec);
+		let f = await createFile(udir, nkName + '_' + msec + '.png');
 		let path = f.fullPath;
 		let fw = await createWriter(f);
 		let total = await writeFile(fw, blob);

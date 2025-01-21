@@ -309,6 +309,7 @@
 		} catch (e) {
 			console.log('lsRe', e);
 		}
+		console.log('Ende ls-R');
 		isSidebarOpen = false;
 	}
 
@@ -318,6 +319,7 @@
 		} catch (e) {
 			console.log('rmR', e);
 		}
+		console.log('Ende rm-R');
 		isSidebarOpen = false;
 	}
 
