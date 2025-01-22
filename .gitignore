@@ -19,8 +19,6 @@ Thumbs.db
 # Vite
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
-src/routes/maps/*
-src/assets/kontrollen.csv
 
 *.csv
 *.webp
@@ -28,3 +26,4 @@ README.MUH.md
 README.MUH copy.md
 images/*
 src/lib/assets/bilder.html
+src/lib/test.ts

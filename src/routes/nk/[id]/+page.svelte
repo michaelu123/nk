@@ -170,7 +170,7 @@
 						<img src={url} alt="" />
 					{:else}
 						<button onclick={takePhoto}>
-							<img src="/src/lib/assets/photo-camera-svgrepo-com.svg" alt="" />
+							<img src="/photo-camera-svgrepo-com.svg" alt="" />
 							<p>Photo aufnehmen</p>
 						</button>
 					{/if}

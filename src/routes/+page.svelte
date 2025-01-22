@@ -29,7 +29,6 @@
 	import greenMarker from '$lib/assets/greenMarker.svg';
 	import selectedMarker from '$lib/assets/yellowMarker.svg';
 	import { Sync } from '$lib/sync.js';
-
 	let nkState = getState();
 	let { data } = $props();
 	let { rootDir, fetch } = data;
@@ -339,7 +338,7 @@
 	// }
 
 	async function syncServer() {
-		const sy = new Sync(nkState, fetch!, (p: number) => (progress = p));
+		const sy = new Sync(nkState, fetch!, (p: number) => (progress = Math.round(p)));
 		await sy.sync();
 	}
 
@@ -487,7 +486,7 @@
 {@render header()}
 <div class="relative">
 	{#if progress}
-		<div class="absolute left-10 top-1/3 z-[490] w-10/12">
+		<div class="absolute left-1/4 top-1/3 z-[490] w-2/4">
 			<Progressbar {progress} labelOutside="Speicherfortschritt" size="h-6" />
 		</div>
 	{/if}
