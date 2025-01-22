@@ -6,6 +6,8 @@ import { ctrl2Str } from './utils';
 
 const MAX_DAYS = 100; // TODO configurable?
 const MAX_TIME_MS = MAX_DAYS * 24 * 60 * 60 * 1000;
+const mucLat = 48.137236594542834;
+const mucLng = 11.576174072626772;
 
 export interface MarkerEntryProps {
 	latLng: number[];
@@ -132,15 +134,21 @@ export interface User {
 	username: string;
 }
 
+export interface Region {
+	name: string;
+	shortName: string;
+	lowerLeft: number[];
+	upperRight: number[];
+	center: number[];
+}
+
 export interface StateProps {
 	user: User | null | undefined;
 	idb: IDBPDatabase | null;
 	bucket: any | null;
 	rootDir: FileSystemDirectoryEntry | null | undefined;
+	region: Region | null | undefined;
 }
-
-let mucLat = 48.137236594542834,
-	mucLng = 11.576174072626772;
 
 export class State implements StateProps {
 	user = $state<User | null | undefined>(null);
@@ -148,13 +156,21 @@ export class State implements StateProps {
 	bucket: any | null = null;
 	rootDir: FileSystemDirectoryEntry | null | undefined = null;
 
-	defaultCenter = $state([mucLat, mucLng]);
+	static regionDefault: Region = {
+		name: 'default',
+		shortName: 'dflt',
+		lowerLeft: [mucLat + 0.1, mucLng - 0.1],
+		upperRight: [mucLat - 0.1, mucLng + 0.1],
+		center: [mucLat, mucLng]
+	};
+
+	regions: Region[] = $state([]);
+	region: Region | null | undefined = $state(State.regionDefault);
+
+	defaultCenter = $state(this.region!.center); // if region is null, we are redirected to /region
 	defaultZoom = $state(16);
 	markerValues = $state<MarkerEntry[]>([]);
-	maxBounds = $state([
-		[48.21736966757146, 11.411914216629935],
-		[48.0478968379877, 11.702028367388204]
-	]);
+	maxBounds = $derived([this.region!.lowerLeft, this.region!.upperRight]);
 	nkTypes: Map<string, number> = $state(new Map());
 	nkSpecies: Map<string, number> = $state(new Map());
 	isLoading = $state(false);
@@ -168,6 +184,7 @@ export class State implements StateProps {
 		this.idb = data.idb;
 		this.bucket = data.bucket;
 		this.rootDir = data.rootDir;
+		this.region = data.region;
 		// keep a ref to bucket, so that it does not close
 		this.fetchData();
 	}
@@ -199,16 +216,7 @@ export class State implements StateProps {
 		} else {
 			// seed occs
 			const occs = which == 'nktypes' ? nkDefaultTypes : nkDefaultSpecies;
-			const js = JSON.stringify(occs);
-			if (this.idb) {
-				try {
-					await this.idb.put('settings', js, which);
-				} catch (e: any) {
-					console.log('err idb.put', e);
-				}
-			} else {
-				localStorage.setItem('_' + which, js);
-			}
+			this.storeSettings(which, occs);
 		}
 		if (which == 'nktypes') {
 			for (const occ of occs) {
@@ -285,10 +293,25 @@ export class State implements StateProps {
 		}
 	}
 
+	async fetchRegionData() {
+		const regionsJS = this.idb
+			? await this.idb.get('settings', 'regions')
+			: localStorage.getItem('_regions');
+		if (regionsJS) {
+			this.regions = JSON.parse(regionsJS);
+		}
+		const regionShortName = this.idb
+			? await this.idb.get('settings', 'regionshortname')
+			: localStorage.getItem('_regionshortname');
+		this.regions = JSON.parse(regionsJS || '[]');
+		this.region = this.regions.find((r) => r.shortName == regionShortName);
+	}
+
 	async fetchData() {
 		this.isLoading = true;
 		try {
 			// await new Promise((r) => setTimeout(r, 2000));
+			await this.fetchRegionData();
 			await this.fetchOccData('nktypes');
 			await this.fetchOccData('nkspecies');
 			const mvals = await this.fetchMarkersData();
@@ -387,12 +410,7 @@ export class State implements StateProps {
 		// this.defaultCenter = center; //  does not trigger state change!?
 		this.defaultCenter = center;
 		this.defaultZoom = zoom;
-		const js = JSON.stringify(this.defaultCenter);
-		if (this.idb) {
-			await this.idb.put('settings', js, 'center');
-		} else {
-			localStorage.setItem('_center', js);
-		}
+		this.storeSettings('center', this.defaultCenter);
 	}
 
 	async storeMv(mv: MarkerEntry) {
@@ -482,6 +500,41 @@ export class State implements StateProps {
 			await this.persistNK(mv, { image: path });
 		} else {
 			console.log(`cannot find nkid ${mvid} for image in ${path}`);
+		}
+	}
+
+	async addOrUpdateRegion(newRegion: Region) {
+		let found = false;
+		for (const r of this.regions) {
+			if (r.shortName == newRegion.shortName) {
+				r.name = newRegion.name;
+				r.lowerLeft = newRegion.lowerLeft;
+				r.upperRight = newRegion.upperRight;
+				found = true;
+				break;
+			}
+		}
+		if (!found) this.regions.push(newRegion);
+		this.storeSettings('regions', this.regions);
+		this.storeSettings('regionshortname', newRegion.shortName);
+	}
+
+	selectRegion(sname: string) {
+		console.log('sr', sname);
+		this.region = this.regions.find((r) => r.shortName == sname);
+		this.storeSettings('regionshortname', sname);
+	}
+
+	storeSettings(key: string, val: any) {
+		const valS = typeof val == 'string' ? val : JSON.stringify(val);
+		if (this.idb) {
+			try {
+				this.idb.put('settings', valS, key);
+			} catch (e: any) {
+				console.log('err idb.put', e);
+			}
+		} else {
+			localStorage.setItem('_' + key, valS);
 		}
 	}
 }

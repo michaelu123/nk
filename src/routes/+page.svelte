@@ -29,9 +29,10 @@
 	import greenMarker from '$lib/assets/greenMarker.svg';
 	import selectedMarker from '$lib/assets/yellowMarker.svg';
 	import { Sync } from '$lib/sync.js';
+
 	let nkState = getState();
 	let { data } = $props();
-	let { rootDir, fetch } = data;
+	let { rootDir, fetch, region } = data;
 
 	let { markerValues, maxBounds, defaultCenter, defaultZoom, isLoading } = $derived(nkState);
 
@@ -50,9 +51,8 @@
 	let centering = $state(false);
 
 	let selectedMarkerIndex = -1;
-	let mucLat = 48.137236594542834,
-		mucLng = 11.576174072626772;
-	let currPos = $state([mucLat, mucLng]);
+	nkState.region = region!;
+	let currPos = $state(nkState.region.center);
 	let radius = $state(100);
 	let followingGPS = $state(false);
 	let isGPSon = $state(false);
@@ -353,9 +353,9 @@
 </script>
 
 {#snippet header()}
-	<div class="sticky top-0 flex h-14 justify-start gap-4 bg-slate-100 p-2">
+	<div class="sticky top-0 flex h-14 items-center justify-start gap-4 bg-slate-100 p-2">
 		<SidebarButton onclick={sidebarUi.toggle} class="mb-2" breakpoint="md" />
-		<div class="w-full"></div>
+		<div class="w-full"><p class="text-center">{region?.name}</p></div>
 		{#if $page.url.hostname == 'localhost'}
 			<Button outline pill onclick={logmap}>?</Button>
 		{/if}
@@ -460,6 +460,7 @@
 			class="absolute right-2 top-2 p-2 md:hidden"
 		/> -->
 		<SidebarGroup border={false}>
+			<SidebarItem label="Revier" href="/region"></SidebarItem>
 			<SidebarItem label="Neues Zentrum" onclick={updDefaultCenter}></SidebarItem>
 			<SidebarItem label="Zum Zentrum" onclick={() => centerMap(defaultCenter)}></SidebarItem>
 			<SidebarItem label={isGPSon ? 'GPS aus' : 'GPS ein'} onclick={posStart}></SidebarItem>
@@ -491,7 +492,11 @@
 		</div>
 	{/if}
 	{@render sidebar()}
-	{@render svmap()}
+	{#if isLoading}
+		<p>Loading</p>
+	{:else}
+		{@render svmap()}
+	{/if}
 </div>
 
 <style>

@@ -2,7 +2,8 @@ import type { LayoutLoad } from './$types';
 import { browser } from '$app/environment';
 import { openDB, type IDBPDatabase, wrap } from 'idb';
 import { getDirectory, getfs } from '$lib/fs';
-// import { redirect } from '@sveltejs/kit';
+import { redirect } from '@sveltejs/kit';
+import type { Region } from '$lib/state.svelte';
 
 let useBucketsAnyways = true; // TODO configurable
 let useIndexedDbAnyways = true; // TODO configurable
@@ -105,6 +106,19 @@ export const load: LayoutLoad = async ({ data, url, fetch }) => {
 	if (browser) {
 		let { idb, bucket } = await getStorage();
 		let rootDir = await getRootDir();
-		return { idb, bucket, user, rootDir, fetch };
+
+		const regionsJS = idb ? await idb.get('settings', 'regions') : localStorage.getItem('_regions');
+		const regionShortName = idb
+			? await idb.get('settings', 'regionshortname')
+			: localStorage.getItem('_regionshortname');
+		const regions: Region[] = JSON.parse(regionsJS || '[]');
+		let region: Region | null | undefined = regions.find((r) => r.shortName == regionShortName);
+
+		if (!region) {
+			if (url.pathname != '/region') {
+				return redirect(303, '/region');
+			}
+		}
+		return { idb, bucket, user, rootDir, region, fetch };
 	}
 };
