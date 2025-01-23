@@ -27,3 +27,4 @@ README.MUH copy.md
 images/*
 src/lib/assets/bilder.html
 src/lib/test.ts
+*.txt

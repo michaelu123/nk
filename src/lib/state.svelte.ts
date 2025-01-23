@@ -520,7 +520,6 @@ export class State implements StateProps {
 	}
 
 	selectRegion(sname: string) {
-		console.log('sr', sname);
 		this.region = this.regions.find((r) => r.shortName == sname);
 		this.storeSettings('regionshortname', sname);
 	}

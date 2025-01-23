@@ -2,9 +2,11 @@
 	import { goto } from '$app/navigation';
 	import { getState, State, type Region } from '$lib/state.svelte';
 	import { Map as SVMap, TileLayer, ControlZoom, ControlAttribution, Polygon } from 'sveaflet';
+	import { onMount } from 'svelte';
 	import { Button, Input, Label, Range, Select } from 'svelte-5-ui-lib';
 
 	let { data } = $props();
+	let pregions = data.regions;
 	let pregion = data.region;
 	let nkState = getState();
 	let { regions, region } = $derived(nkState);
@@ -14,6 +16,8 @@
 	let zoom = $state(16);
 	let xoff = $state(6);
 	let yoff = $state(6);
+	let isEditMode = $state(false);
+	let isNewRegion = $state(false);
 	let maxBounds = $derived.by(() =>
 		region && !isEditMode
 			? [region.lowerLeft, region.upperRight]
@@ -22,8 +26,6 @@
 					[center[0] - yoff / 5000, center[1] + xoff / 3000]
 				]
 	);
-	let isEditMode = $state(false);
-	let isNewRegion = $state(false);
 	// svelte-ignore state_referenced_locally
 	let regionName = $state(region?.name || '');
 	// svelte-ignore state_referenced_locally
@@ -43,8 +45,14 @@
 			map.on('move', onMapMove);
 		}
 	});
-	$effect(() => {
-		isEditMode = !regions || regions.length == 0 || !region;
+
+	onMount(() => {
+		if (pregion && region) {
+			region.lowerLeft = pregion.lowerLeft;
+			region.upperRight = pregion.upperRight;
+		}
+		isEditMode = !pregions || pregions.length == 0;
+		isNewRegion = isEditMode;
 	});
 
 	async function toggleEditMode(newreg: boolean) {
@@ -55,24 +63,26 @@
 				errorMessage1 = 'Bitte einen Namen eingeben';
 				return;
 			}
-			for (const r of regions) {
-				if (r.name == regionName) {
-					errorMessage1 = 'Bitte einen anderen Namen wählen';
+			if (isNewRegion) {
+				for (const r of regions) {
+					if (r.name == regionName) {
+						errorMessage1 = 'Bitte einen anderen Namen wählen';
+						return;
+					}
+				}
+				if (!shortName) {
+					errorMessage2 = 'Bitte einen Kurznamen eingeben (nicht mehr als 6 Zeichen)';
 					return;
 				}
-			}
-			if (!shortName) {
-				errorMessage2 = 'Bitte einen Kurznamen eingeben (nicht mehr als 6 Zeichen)';
-				return;
-			}
-			if (shortName.length > 6) {
-				errorMessage2 = 'Bitte nicht mehr als 6 Zeichen';
-				return;
-			}
-			for (const r of regions) {
-				if (r.shortName == shortName) {
-					errorMessage1 = 'Bitte einen anderen Kurznamen wählen';
+				if (shortName.length > 6) {
+					errorMessage2 = 'Bitte nicht mehr als 6 Zeichen';
 					return;
+				}
+				for (const r of regions) {
+					if (r.shortName == shortName) {
+						errorMessage1 = 'Bitte einen anderen Kurznamen wählen';
+						return;
+					}
 				}
 			}
 			let newRegion: Region = {
@@ -80,7 +90,7 @@
 				shortName,
 				lowerLeft: maxBounds[0],
 				upperRight: maxBounds[1],
-				center
+				center: [(maxBounds[0][0] + maxBounds[1][0]) / 2, (maxBounds[0][1] + maxBounds[1][1]) / 2]
 			};
 			await nkState.addOrUpdateRegion(newRegion);
 			if (newreg) {
@@ -89,6 +99,17 @@
 			}
 		} else {
 			map.on('move', onMapMove);
+			if (isNewRegion) {
+				regionName = '';
+				shortName = '';
+				center = State.regionDefault.center;
+				xoff = 6;
+				yoff = 6;
+			} else {
+				center = pregion!.center;
+				xoff = (center[1] - pregion!.lowerLeft[1]) * 3000;
+				yoff = (pregion!.lowerLeft[0] - center[0]) * 5000;
+			}
 		}
 		isEditMode = !isEditMode;
 	}
@@ -97,7 +118,6 @@
 		const sname = e.target.value;
 		const rg = regions.find((r) => r.shortName == sname);
 		nkState.selectRegion(sname);
-		console.log('sr', rg!.center);
 		center = rg!.center;
 		nkState.updDefaultCenter(rg!.center, map.getZoom());
 		const options = { animate: false };
@@ -113,6 +133,7 @@
 	function goBack() {
 		regionName = region!.name;
 		shortName = region!.shortName;
+		center = region!.center;
 		isEditMode = false;
 		map.off('move', onMapMove);
 	}
@@ -168,12 +189,12 @@
 		<Button class="m-4 w-min" onclick={() => toggleEditMode(false)}
 			>{isEditMode ? 'Speichern' : 'Ändern'}</Button
 		>
-		<Button class="m-4 w-min" onclick={goBack}>Nicht speichern</Button>
+		<Button class="m-4 w-min whitespace-nowrap" onclick={goBack}>Nicht speichern</Button>
 	</div>
 {/snippet}
 
 {#snippet display()}
-	<h1 class="text-center font-bold">Revier auswählen</h1>
+	<h1 class="mb-4 text-center text-xl font-bold">Revier auswählen</h1>
 	<div class="mb-4 flex flex-row">
 		<Label class="w-40 shrink-0" for="value_select">Revier auswählen:</Label>
 		<Select
@@ -188,7 +209,7 @@
 			{/each}
 		</Select>
 	</div>
-	{#if region}
+	<!-- {#if region}
 		<Label for="regionname" class="mb-4">
 			Name des Reviers
 			<Input
@@ -215,18 +236,20 @@
 				readonly={true}
 			/>
 		</Label>
-	{/if}
+	{/if} -->
 	<div class="mb-4 flex flex-row flex-wrap">
-		<Button class="m-4 w-min" onclick={() => toggleEditMode(false)}
-			>{isEditMode ? 'Speichern' : 'Ändern'}</Button
-		>
+		{#if region}
+			<Button class="m-4 w-min whitespace-nowrap" onclick={() => goto('/')}>Zur Karte</Button>
+			<Button class="m-4 w-min" onclick={() => toggleEditMode(false)}
+				>{isEditMode ? 'Speichern' : 'Ändern'}</Button
+			>
+			<Button class="m-4 w-min" onclick={deleteRegion}>Löschen</Button>
+		{/if}
 		<Button class="m-4 w-min" onclick={() => toggleEditMode(true)}>Neu</Button>
-		<Button class="m-4 w-min whitespace-nowrap" onclick={deleteRegion}>Löschen</Button>
-		<Button class="m-4 w-min whitespace-nowrap" href="/">Zur Karte</Button>
 	</div>
 {/snippet}
 
-<div class="m-10 flex h-screen flex-col">
+<div class="flex h-screen flex-col p-6">
 	{#if isEditMode}
 		{@render editing()}
 	{:else}

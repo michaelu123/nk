@@ -32,7 +32,8 @@
 
 	let nkState = getState();
 	let { data } = $props();
-	let { rootDir, fetch, region } = data;
+	let { rootDir, fetch } = data;
+	let { region } = $derived(nkState);
 
 	let { markerValues, maxBounds, defaultCenter, defaultZoom, isLoading } = $derived(nkState);
 
@@ -353,7 +354,9 @@
 </script>
 
 {#snippet header()}
-	<div class="sticky top-0 flex h-14 items-center justify-start gap-4 bg-slate-100 p-2">
+	<div
+		class="absolute top-0 z-[500] flex h-16 w-11/12 items-center justify-start gap-4 bg-slate-100 p-2"
+	>
 		<SidebarButton onclick={sidebarUi.toggle} class="mb-2" breakpoint="md" />
 		<div class="w-full"><p class="text-center">{region?.name}</p></div>
 		{#if $page.url.hostname == 'localhost'}
@@ -375,7 +378,7 @@
 					zoom: defaultZoom,
 					maxZoom: 20,
 					minZoom: 10,
-					zoomControl: false,
+					zoomControl: false, // switch off default control in the top left corner
 					attributionControl: true,
 					maxBounds
 				}}
@@ -484,20 +487,20 @@
 	</Sidebar>
 {/snippet}
 
-{@render header()}
 <div class="relative">
+	{@render header()}
 	{#if progress}
 		<div class="absolute left-1/4 top-1/3 z-[490] w-2/4">
 			<Progressbar {progress} labelOutside="Speicherfortschritt" size="h-6" />
 		</div>
 	{/if}
-	{@render sidebar()}
-	{#if isLoading}
-		<p>Loading</p>
-	{:else}
-		{@render svmap()}
-	{/if}
 </div>
+{@render sidebar()}
+{#if isLoading}
+	<p>Loading</p>
+{:else}
+	{@render svmap()}
+{/if}
 
 <style>
 	#crosshair {

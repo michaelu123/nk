@@ -119,6 +119,6 @@ export const load: LayoutLoad = async ({ data, url, fetch }) => {
 				return redirect(303, '/region');
 			}
 		}
-		return { idb, bucket, user, rootDir, region, fetch };
+		return { idb, bucket, user, rootDir, region, regions, fetch };
 	}
 };
