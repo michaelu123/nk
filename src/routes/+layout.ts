@@ -111,14 +111,18 @@ export const load: LayoutLoad = async ({ data, url, fetch }) => {
 		const regionShortName = idb
 			? await idb.get('settings', 'regionshortname')
 			: localStorage.getItem('_regionshortname');
-		const regions: Region[] = JSON.parse(regionsJS || '[]');
-		let region: Region | null | undefined = regions.find((r) => r.shortName == regionShortName);
+		try {
+			const regions: Region[] = JSON.parse(regionsJS || '[]');
+			let region: Region | null | undefined = regions.find((r) => r.shortName == regionShortName);
 
-		if (!region) {
-			if (url.pathname != '/region') {
-				return redirect(303, '/region');
+			if (!region) {
+				if (url.pathname != '/region') {
+					return redirect(303, '/region');
+				}
 			}
+			return { idb, bucket, user, rootDir, region, regions, fetch };
+		} catch (e) {
+			return { idb, bucket, user, rootDir, fetch };
 		}
-		return { idb, bucket, user, rootDir, region, regions, fetch };
 	}
 };

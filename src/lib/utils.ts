@@ -1,4 +1,4 @@
-import type { ControlEntry, MarkerEntryProps } from './state.svelte';
+import type { ControlEntry, MarkerEntryProps, Region } from './state.svelte';
 
 export function flattenObj(obj: any, res: any) {
 	for (let key in obj) {
@@ -37,6 +37,16 @@ export function ctrl2Str(ctrl: ControlEntry, forLocal: boolean): string {
 		if (k == 'createdAt' && !forLocal) return undefined;
 		if (k == 'changedAt' && !forLocal) return undefined;
 		if (k == 'deletedAt' && !forLocal) return undefined;
+		return v;
+	});
+	return js;
+}
+
+export function region2Str(r: Region): string {
+	const js = JSON.stringify(r, (k, v) => {
+		if (k == 'id') return undefined;
+		if (k == 'shortName') return undefined;
+		if (k == 'name') return undefined;
 		return v;
 	});
 	return js;

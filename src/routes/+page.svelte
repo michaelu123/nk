@@ -52,6 +52,7 @@
 	let centering = $state(false);
 
 	let selectedMarkerIndex = -1;
+	// svelte-ignore state_referenced_locally
 	nkState.region = region!;
 	let currPos = $state(nkState.region.center);
 	let radius = $state(100);
