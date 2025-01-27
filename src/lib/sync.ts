@@ -112,7 +112,6 @@ export class Sync {
 	async fromServer(): Promise<number> {
 		// transfer DB to local data
 		const nkResponse = await this.fetch('/api/db?what=nk&region=' + this.shortName, {
-			// TODO
 			method: 'GET',
 			headers: {
 				'Content-Type': 'application/json'
@@ -120,7 +119,6 @@ export class Sync {
 		});
 		const mvals = (await nkResponse.json()) as MarkerEntryProps[];
 		const ctrlResponse = await this.fetch('/api/db?what=ctrls&region=' + this.shortName, {
-			// TODO
 			method: 'GET',
 			headers: {
 				'Content-Type': 'application/json'
@@ -163,7 +161,7 @@ export class Sync {
 
 	async sync() {
 		const counters = new Map<string, any>();
-		// TODO await this.storeLoadRegions();
+		await this.storeLoadRegions();
 		// clear local data
 		await this.clearDb();
 		for (const region of this.nkState.regions) {
@@ -174,7 +172,7 @@ export class Sync {
 			this.nkCount = 0;
 			this.ctrlsCount = 0;
 
-			const toCnt = 0; //  await this.toServer(); TODO
+			const toCnt = await this.toServer();
 
 			const fromCnt = this.fromServer();
 			await sleep(100);
