@@ -41,6 +41,9 @@ export class Sync {
 	private idb: IDBPDatabase | null = null;
 	private imgFromCnt = 0;
 	private imgToCnt = 0;
+	private nkCount = 0;
+	private ctrlsCount = 0;
+	private shortName = '';
 
 	constructor(nkState: State, fetch: Function, setProgress: Function) {
 		this.nkState = nkState;
@@ -49,13 +52,11 @@ export class Sync {
 		this.idb = nkState.idb;
 	}
 
-	async sync() {
+	async toServer(): Promise<number> {
 		const scMap = new Map<string, ServerChanges>(); // lastChanged date of db entries
 		const csMap = new Map<string, CmpResult>(); // client: newer or new on client
 
-		await this.storeLoadRegions();
-
-		const chgResponse = await this.fetch('/api/db?what=chg', {
+		const chgResponse = await this.fetch('/api/db?what=chg&region=' + this.shortName, {
 			method: 'GET',
 			headers: {
 				'Content-Type': 'application/json'
@@ -77,7 +78,7 @@ export class Sync {
 		await this.nkState.fetchCtrlsProps(this.mvalsP);
 
 		for (let mvP of this.mvalsP) {
-			const cmpRes = await this.compareChanges(mvP, scMap.get(mvP.id));
+			const cmpRes = await this.compareChanges(mvP, scMap.get(mvP.id) ?? null);
 			csMap.set(mvP.id, cmpRes); // may overwrite entries set to server above
 		}
 		csMap.forEach((v, k) => {
@@ -105,19 +106,21 @@ export class Sync {
 			const progress = (cnt / len) * 100;
 			this.setProgress(progress);
 		}
+		return toCnt;
+	}
 
-		// clear local data
-		await this.clearDb();
-
+	async fromServer(): Promise<number> {
 		// transfer DB to local data
-		const nkResponse = await this.fetch('/api/db?what=nk', {
+		const nkResponse = await this.fetch('/api/db?what=nk&region=' + this.shortName, {
+			// TODO
 			method: 'GET',
 			headers: {
 				'Content-Type': 'application/json'
 			}
 		});
 		const mvals = (await nkResponse.json()) as MarkerEntryProps[];
-		const ctrlResponse = await this.fetch('/api/db?what=kn', {
+		const ctrlResponse = await this.fetch('/api/db?what=ctrls&region=' + this.shortName, {
+			// TODO
 			method: 'GET',
 			headers: {
 				'Content-Type': 'application/json'
@@ -125,21 +128,22 @@ export class Sync {
 		});
 		const ctrls = (await ctrlResponse.json()) as ControlEntry[];
 
-		len = mvals.length + ctrls.length;
+		const len = mvals.length + ctrls.length;
 		let fromCnt = len;
-		cnt = 0;
+		let cnt = 0;
 		for (const mvP of mvals) {
-			const js = mv2DBStr(mvP, false);
 			if (this.idb) {
 				try {
-					await this.idb.put('nk', js, mvP.id.toString());
+					const res = await this.idb.put('nk', mvP, mvP.id.toString());
 				} catch (e: any) {
 					console.log('err idb.put', e);
 				}
 			} else {
-				localStorage.setItem(mvP.id, js);
+				const js = mv2DBStr(mvP, false);
+				localStorage.setItem(this.shortName + '_' + mvP.id, js);
 			}
 			cnt++;
+			this.nkCount++;
 			const progress = (cnt / len) * 100;
 			this.setProgress(progress);
 		}
@@ -148,19 +152,43 @@ export class Sync {
 			ctrl.nkid = ctrl.nkid.toString();
 			this.nkState.storeCtrl(ctrl);
 			cnt++;
+			this.ctrlsCount++;
 			const progress = (cnt / len) * 100;
 			this.setProgress(progress);
 		}
 		this.nkState.fetchData();
 		this.setProgress(0);
-		await sleep(100);
-		alert(`Datensätze zum Server übertragen: ${toCnt}
-Datensätze vom Server neu geholt: ${fromCnt}
-Davon Datensätze für Nistkästen: ${mvals.length}
-und für Kontrollen: ${ctrls.length}.
-Bilder zum Server übertragen: ${this.imgToCnt}
-Bilder vom Server geholt: ${this.imgFromCnt}
-`);
+		return fromCnt;
+	}
+
+	async sync() {
+		const counters = new Map<string, any>();
+		// TODO await this.storeLoadRegions();
+		// clear local data
+		await this.clearDb();
+		for (const region of this.nkState.regions) {
+			this.shortName = region.shortName;
+			this.nkState.selectedRegion = region.shortName;
+			const scMap = new Map<string, ServerChanges>(); // lastChanged date of db entries
+			const csMap = new Map<string, CmpResult>(); // client: newer or new on client
+			this.nkCount = 0;
+			this.ctrlsCount = 0;
+
+			const toCnt = 0; //  await this.toServer(); TODO
+
+			const fromCnt = this.fromServer();
+			await sleep(100);
+			counters.set(region.name, { toCnt, fromCnt, nkCnt: this.nkCount, ctrlCnt: this.ctrlsCount });
+		}
+
+		// 		alert(`Datensätze zum Server übertragen: ${toCnt}
+		// Datensätze vom Server neu geholt: ${fromCnt}
+		// Davon Datensätze für Nistkästen: ${this.mvalsCount}
+		// und für Kontrollen: ${this.ctrlsCount}.
+		// Bilder zum Server übertragen: ${this.imgToCnt}
+		// Bilder vom Server geholt: ${this.imgFromCnt}
+		// `);
+		alert('data transfers' + JSON.stringify(counters)); // TODO
 	}
 
 	async postImage(imgPath: string) {
@@ -207,7 +235,7 @@ Bilder vom Server geholt: ${this.imgFromCnt}
 
 	async storeOnServer(mvP: MarkerEntryProps) {
 		const js = mv2DBStr(mvP, true);
-		const response = await fetch!('/api/db?what=nk&region=' + this.nkState.region!.shortName, {
+		const response = await fetch!('/api/db?what=nk&region=' + this.shortName, {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/json'
@@ -216,13 +244,10 @@ Bilder vom Server geholt: ${this.imgFromCnt}
 		});
 	}
 
-	async compareChanges(mvP: MarkerEntryProps, sc: ServerChanges | undefined): Promise<CmpResult> {
+	async compareChanges(mvP: MarkerEntryProps, sc: ServerChanges | null): Promise<CmpResult> {
 		const imgFromServer: string[] = [];
 		const imgToServer: string[] = [];
 		let cmp = 0;
-		if (mvP.id == '240') {
-			console.log('240'); // TODO
-		}
 
 		if (!sc) {
 			if (mvP.image) imgToServer.push(mvP.image);
@@ -352,9 +377,10 @@ Bilder vom Server geholt: ${this.imgFromCnt}
 	}
 
 	async storeLoadRegions() {
-		const regionsJS = this.idb
+		const rval = this.idb
 			? await this.idb.get('settings', 'regions')
 			: localStorage.getItem('_regions');
+		const regionsJS = this.idb ? JSON.stringify(rval) : rval;
 		try {
 			const response = await fetch('/api/db?what=regions', {
 				method: 'POST',
@@ -377,7 +403,6 @@ Bilder vom Server geholt: ${this.imgFromCnt}
 					};
 					regions.push(r);
 				}
-				console.log('slr', regions);
 				this.nkState.storeSettings('regions', regions);
 			}
 		} catch (e) {

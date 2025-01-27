@@ -17,6 +17,7 @@ export interface MarkerEntryProps {
 	lastCleaned: Date | string | null;
 	id: string;
 	name: string;
+	region: string;
 	nkType: string;
 	comment: string;
 	image: string | null;
@@ -33,6 +34,7 @@ export class MarkerEntry implements MarkerEntryProps {
 	lastCleaned: Date | null = $state(null);
 	id = '';
 	name = $state('');
+	region = $state('');
 	nkType = $state('');
 	comment = $state('');
 	image: string | null = $state(null);
@@ -51,6 +53,7 @@ export class MarkerEntry implements MarkerEntryProps {
 		this.color = data.color;
 		this.id = data.id;
 		this.name = data.name;
+		this.region = data.region;
 		this.nkType = data.nkType;
 		this.comment = data.comment;
 		this.image = data.image;
@@ -68,6 +71,7 @@ export class MarkerEntry implements MarkerEntryProps {
 			lastCleaned: this.lastCleaned,
 			id: this.id,
 			name: this.name,
+			region: this.region,
 			nkType: this.nkType,
 			comment: this.comment,
 			image: this.image,
@@ -112,6 +116,7 @@ export interface ControlEntry {
 	id: string;
 	nkid: string;
 	name: string;
+	region: string;
 	date: Date;
 	species: string | null;
 	comment: string | null;
@@ -143,18 +148,20 @@ export interface Region {
 }
 
 export interface StateProps {
-	user: User | null | undefined;
+	user: User | null;
 	idb: IDBPDatabase | null;
 	bucket: any | null;
-	rootDir: FileSystemDirectoryEntry | null | undefined;
-	region: Region | null | undefined;
+	rootDir: FileSystemDirectoryEntry | null;
+	region: Region | null;
+	regions: Region[] | null;
+	selectedRegion: string | null;
 }
 
 export class State implements StateProps {
-	user = $state<User | null | undefined>(null);
+	user = $state<User | null>(null);
 	idb: IDBPDatabase | null = null;
 	bucket: any | null = null;
-	rootDir: FileSystemDirectoryEntry | null | undefined = null;
+	rootDir: FileSystemDirectoryEntry | null = null;
 
 	static regionDefault: Region = {
 		name: 'default',
@@ -165,12 +172,16 @@ export class State implements StateProps {
 	};
 
 	regions: Region[] = $state([]);
-	region: Region | null | undefined = $state(State.regionDefault);
+	region: Region | null = $state(null);
+	selectedRegion: string | null = $state(null);
 
-	defaultCenter = $state(this.region!.center); // if region is null, we are redirected to /region
+	defaultCenter = $state(this.region ? this.region.center : State.regionDefault.center);
 	defaultZoom = $state(16);
 	markerValues = $state<MarkerEntry[]>([]);
-	maxBounds = $derived([this.region!.lowerLeft, this.region!.upperRight]);
+	maxBounds = $derived([
+		this.region ? this.region.lowerLeft : State.regionDefault.lowerLeft,
+		this.region ? this.region.upperRight : State.regionDefault.upperRight
+	]);
 	nkTypes: Map<string, number> = $state(new Map());
 	nkSpecies: Map<string, number> = $state(new Map());
 	isLoading = $state(false);
@@ -182,10 +193,12 @@ export class State implements StateProps {
 	updateState(data: StateProps) {
 		this.user = data.user;
 		this.idb = data.idb;
-		this.bucket = data.bucket;
+		this.bucket = data.bucket; // keep a ref to bucket, so that it does not close
 		this.rootDir = data.rootDir;
 		this.region = data.region;
-		// keep a ref to bucket, so that it does not close
+		this.regions = data.regions || [];
+		this.selectedRegion = data.selectedRegion;
+		console.log('updatestate region', this.region);
 		this.fetchData();
 	}
 
@@ -195,10 +208,11 @@ export class State implements StateProps {
 		for (let i = 0; i < len; i++) {
 			const k = localStorage.key(i);
 			if (k) {
+				// _k_ : ctrl entry, _ : settings entry, nk without _
 				if (nk) {
-					if (k.startsWith('_')) continue;
+					if (!k.startsWith(this.selectedRegion!)) continue;
 				} else {
-					if (!k.startsWith('_k_')) continue;
+					if (!k.startsWith('_k_' + this.selectedRegion)) continue;
 				}
 				res.push(k);
 			}
@@ -208,12 +222,13 @@ export class State implements StateProps {
 
 	async fetchOccData(which: 'nktypes' | 'nkspecies') {
 		let occs: string[] = [];
-		const occval = this.idb
-			? await this.idb.get('settings', which)
-			: localStorage.getItem('_' + which);
-		if (occval) {
-			occs = JSON.parse(occval);
+		if (this.idb) {
+			occs = await this.idb.get('settings', which);
 		} else {
+			const occJS = localStorage.getItem('_' + which);
+			occs = JSON.parse(occJS || '[]');
+		}
+		if (!occs || occs.length == 0) {
 			// seed occs
 			const occs = which == 'nktypes' ? nkDefaultTypes : nkDefaultSpecies;
 			this.storeSettings(which, occs);
@@ -230,14 +245,26 @@ export class State implements StateProps {
 	}
 
 	async fetchMarkersData(): Promise<MarkerEntry[]> {
+		const xxx = await this.idb!.getAllKeysFromIndex(
+			'nk',
+			'nkRegionIndex',
+			IDBKeyRange.only(this.selectedRegion)
+		);
+
 		const mvals: MarkerEntry[] = [];
 		let keys = this.idb
-			? (await this.idb.getAllKeys('nk')).map((k) => k.toString())
+			? (
+					await this.idb.getAllKeysFromIndex(
+						'nk',
+						'nkRegionIndex',
+						IDBKeyRange.only(this.selectedRegion)
+					)
+				).map((k) => k.toString())
 			: this.getLocalStorageKeys(true);
 
 		for (let key of keys) {
 			const val = this.idb ? await this.idb.get('nk', key) : localStorage.getItem(key);
-			const mv = new MarkerEntry(JSON.parse(val) as MarkerEntryProps);
+			const mv = new MarkerEntry((this.idb ? val : JSON.parse(val)) as MarkerEntryProps);
 			mv.id = key;
 			mvals.push(mv);
 			this.updNkTypes(mv.nkType);
@@ -248,12 +275,18 @@ export class State implements StateProps {
 	async fetchMarkersProps(): Promise<MarkerEntryProps[]> {
 		const mvals: MarkerEntryProps[] = [];
 		let keys = this.idb
-			? (await this.idb.getAllKeys('nk')).map((k) => k.toString())
+			? (
+					await this.idb.getAllKeysFromIndex(
+						'nk',
+						'nkRegionIndex',
+						IDBKeyRange.only(this.selectedRegion)
+					)
+				).map((k) => k.toString())
 			: this.getLocalStorageKeys(true);
 
 		for (let key of keys) {
 			const val = this.idb ? await this.idb.get('nk', key) : localStorage.getItem(key);
-			const mv = JSON.parse(val) as MarkerEntryProps;
+			const mv = (this.idb ? val : JSON.parse(val)) as MarkerEntryProps;
 			mv.id = key;
 			mvals.push(mv);
 		}
@@ -266,11 +299,17 @@ export class State implements StateProps {
 			markerMap.set(mv.id, mv);
 		}
 		let keys = this.idb
-			? (await this.idb.getAllKeys('kontrollen')).map((k) => k.toString())
+			? (
+					await this.idb.getAllKeysFromIndex(
+						'kontrollen',
+						'nkRegionIndex',
+						IDBKeyRange.only(this.selectedRegion)
+					)
+				).map((k) => k.toString())
 			: this.getLocalStorageKeys(false);
 		for (let key of keys) {
 			const val = this.idb ? await this.idb.get('kontrollen', key) : localStorage.getItem(key);
-			const ctrl = JSON.parse(val) as ControlEntry;
+			const ctrl = (this.idb ? val : JSON.parse(val)) as ControlEntry;
 			ctrl.id = key;
 			ctrl.date = new Date(ctrl.date);
 			let mv = markerMap.get(ctrl.nkid);
@@ -283,28 +322,67 @@ export class State implements StateProps {
 		}
 	}
 
+	async fetchCtrlsData(mvals: MarkerEntry[], forSync: boolean) {
+		const markerMap: Map<string, MarkerEntry> = new Map();
+		for (let mv of mvals) {
+			markerMap.set(mv.id, mv);
+		}
+		let keys = this.idb
+			? (
+					await this.idb.getAllKeysFromIndex(
+						'kontrollen',
+						'nkRegionIndex',
+						IDBKeyRange.only(this.selectedRegion)
+					)
+				).map((k) => k.toString())
+			: this.getLocalStorageKeys(false);
+		for (let key of keys) {
+			const val = this.idb ? await this.idb.get('kontrollen', key) : localStorage.getItem(key);
+			const ctrl = (this.idb ? val : JSON.parse(val)) as ControlEntry;
+			ctrl.id = key;
+			if (!forSync && ctrl.deletedAt) continue;
+			ctrl.date = new Date(ctrl.date);
+			let mv = markerMap.get(ctrl.nkid);
+			if (mv) {
+				if (!mv.ctrls) mv.ctrls = [];
+				mv.ctrls.push(ctrl);
+				if (ctrl.cleaned && (!mv.lastCleaned || ctrl.date > mv.lastCleaned)) {
+					mv.lastCleaned = ctrl.date;
+				}
+				if (ctrl.species) this.updNkSpecies(ctrl.species);
+			} else {
+				console.log('no marker for control ' + JSON.stringify(ctrl));
+			}
+		}
+		for (let mv of mvals) {
+			mv.setColor();
+			if (mv.ctrls && mv.ctrls.length > 1) {
+				mv.ctrls = mv.ctrls.toSorted((b, a) => a.date.valueOf() - b.date.valueOf());
+			}
+		}
+	}
+
 	async fetchCenterData() {
 		const cval = this.idb
 			? await this.idb.get('settings', 'center')
 			: localStorage.getItem('_center');
 		if (cval) {
-			const center = JSON.parse(cval) as number[];
+			const center = (this.idb ? cval : JSON.parse(cval)) as number[];
 			this.defaultCenter = center;
 		}
 	}
 
 	async fetchRegionData() {
-		const regionsJS = this.idb
+		const rval = this.idb
 			? await this.idb.get('settings', 'regions')
 			: localStorage.getItem('_regions');
-		if (regionsJS) {
-			this.regions = JSON.parse(regionsJS);
+		if (rval) {
+			this.regions = (this.idb ? rval : JSON.parse(rval)) as Region[];
 		}
-		const regionShortName = this.idb
-			? await this.idb.get('settings', 'regionshortname')
-			: localStorage.getItem('_regionshortname');
-		this.regions = JSON.parse(regionsJS || '[]');
-		this.region = this.regions.find((r) => r.shortName == regionShortName);
+		const selectedRegion = this.idb
+			? await this.idb.get('settings', 'selectedRegion')
+			: localStorage.getItem('_selectedRegion');
+		this.region = this.regions.find((r) => r.shortName == selectedRegion) || State.regionDefault;
 	}
 
 	async fetchData() {
@@ -331,49 +409,15 @@ export class State implements StateProps {
 	}
 
 	async storeCtrl(ctrl: ControlEntry) {
-		const js = ctrl2Str(ctrl, true);
 		if (this.idb) {
 			try {
-				await this.idb.put('kontrollen', js, ctrl.id.toString());
+				await this.idb.put('kontrollen', ctrl, ctrl.id.toString());
 			} catch (e: any) {
 				console.log('err idb.put', e);
 			}
 		} else {
-			localStorage.setItem('_k_' + ctrl.id, js);
-		}
-	}
-
-	async fetchCtrlsData(mvals: MarkerEntry[], forSync: boolean) {
-		const markerMap: Map<string, MarkerEntry> = new Map();
-		for (let mv of mvals) {
-			markerMap.set(mv.id, mv);
-		}
-		let keys = this.idb
-			? (await this.idb.getAllKeys('kontrollen')).map((k) => k.toString())
-			: this.getLocalStorageKeys(false);
-		for (let key of keys) {
-			const val = this.idb ? await this.idb.get('kontrollen', key) : localStorage.getItem(key);
-			const ctrl = JSON.parse(val) as ControlEntry;
-			ctrl.id = key;
-			if (!forSync && ctrl.deletedAt) continue;
-			ctrl.date = new Date(ctrl.date);
-			let mv = markerMap.get(ctrl.nkid);
-			if (mv) {
-				if (!mv.ctrls) mv.ctrls = [];
-				mv.ctrls.push(ctrl);
-				if (ctrl.cleaned && (!mv.lastCleaned || ctrl.date > mv.lastCleaned)) {
-					mv.lastCleaned = ctrl.date;
-				}
-				if (ctrl.species) this.updNkSpecies(ctrl.species);
-			} else {
-				console.log('no marker for control ' + JSON.stringify(ctrl));
-			}
-		}
-		for (let mv of mvals) {
-			mv.setColor();
-			if (mv.ctrls && mv.ctrls.length > 1) {
-				mv.ctrls = mv.ctrls.toSorted((b, a) => a.date.valueOf() - b.date.valueOf());
-			}
+			const js = ctrl2Str(ctrl, true);
+			localStorage.setItem('_k_' + this.selectedRegion + '_' + ctrl.id, js);
 		}
 	}
 
@@ -414,15 +458,15 @@ export class State implements StateProps {
 	}
 
 	async storeMv(mv: MarkerEntry) {
-		const js = mv.mv2str();
 		if (this.idb) {
 			try {
-				await this.idb.put('nk', js, mv.id);
+				await this.idb.put('nk', mv, mv.id);
 			} catch (e: any) {
 				console.log('err idb.put', e);
 			}
 		} else {
-			localStorage.setItem(mv.id, js);
+			const js = mv.mv2str();
+			localStorage.setItem(this.selectedRegion + '_' + mv.id, js);
 		}
 	}
 
@@ -516,23 +560,42 @@ export class State implements StateProps {
 		}
 		if (!found) this.regions.push(newRegion);
 		this.storeSettings('regions', this.regions);
-		this.storeSettings('regionshortname', newRegion.shortName);
+		this.storeSettings('selectedRegion', newRegion.shortName);
 	}
 
 	selectRegion(sname: string) {
-		this.region = this.regions.find((r) => r.shortName == sname);
-		this.storeSettings('regionshortname', sname);
+		this.region = this.regions.find((r) => r.shortName == sname) || State.regionDefault;
+		this.storeSettings('selectedRegion', sname);
 	}
 
-	storeSettings(key: string, val: any) {
-		const valS = typeof val == 'string' ? val : JSON.stringify(val);
+	async storeSettings(key: string, val: any) {
 		if (this.idb) {
 			try {
-				this.idb.put('settings', valS, key);
+				await this.idb.put('settings', val, key);
 			} catch (e: any) {
 				console.log('err idb.put', e);
+				console.log('err val', val);
 			}
 		} else {
+			const valS = typeof val == 'string' ? val : JSON.stringify(val);
+			localStorage.setItem('_' + key, valS);
+		}
+	}
+
+	static async storeSettings(
+		idb: IDBPDatabase<unknown> | null,
+		key: string,
+		val: any
+	): Promise<void> {
+		if (idb) {
+			try {
+				await idb.put('settings', val, key);
+			} catch (e: any) {
+				console.log('err idb.put', e);
+				console.log('err val', val);
+			}
+		} else {
+			const valS = typeof val == 'string' ? val : JSON.stringify(val);
 			localStorage.setItem('_' + key, valS);
 		}
 	}

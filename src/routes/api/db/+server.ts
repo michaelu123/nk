@@ -2,7 +2,7 @@ import { type ControlEntry, type MarkerEntryProps, type Region } from '$lib/stat
 import { type RequestHandler, error, json } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
 import * as nktables from '$lib/server/db/schema';
-import { eq, inArray, isNull } from 'drizzle-orm';
+import { eq, and, inArray, isNull } from 'drizzle-orm';
 import { type ServerChanges } from '$lib/sync';
 import type {
 	CtrlDbInsert,
@@ -261,12 +261,12 @@ async function postRegions(request: Request, userObj: any) {
 			data: nktables.regions.data
 		})
 		.from(nktables.regions)
-		.where(inArray(nktables.regions.id, regionIdQuery));
+		.where(and(isNull(nktables.regions.deletedAt), inArray(nktables.regions.id, regionIdQuery)));
 
 	return json(regionsDB);
 }
 
-async function getChgs(): Promise<Response> {
+async function getChgs(region: string | null): Promise<Response> {
 	let scMap = new Map<number, ServerChanges>();
 	let mchanges = await db
 		.select({
@@ -276,7 +276,9 @@ async function getChgs(): Promise<Response> {
 			changedAt: nktables.nk.changedAt,
 			deletedAt: nktables.nk.deletedAt
 		})
-		.from(nktables.nk);
+		.from(nktables.nk)
+		.where(and(isNull(nktables.nk.deletedAt), eq(nktables.nk.region, region!)));
+
 	for (const mchange of mchanges) {
 		const data = JSON.parse(mchange.data!);
 		let lc = lastChanged(mchange);
@@ -291,7 +293,9 @@ async function getChgs(): Promise<Response> {
 			changedAt: nktables.kontrollen.changedAt,
 			deletedAt: nktables.kontrollen.deletedAt
 		})
-		.from(nktables.kontrollen);
+		.from(nktables.kontrollen)
+		.where(and(isNull(nktables.nk.deletedAt), eq(nktables.nk.region, region!)));
+
 	for (const cchange of cchanges) {
 		const data = JSON.parse(cchange.data!);
 		let lc = lastChanged(cchange);
@@ -306,8 +310,12 @@ async function getChgs(): Promise<Response> {
 	return json([]);
 }
 
-async function getMvs(): Promise<Response> {
-	let mvalsDB = await db.select().from(nktables.nk).where(isNull(nktables.nk.deletedAt));
+async function getMvs(region: string | null): Promise<Response> {
+	if (!region) return error(400, 'need region parameter');
+	let mvalsDB = await db
+		.select()
+		.from(nktables.nk)
+		.where(and(isNull(nktables.nk.deletedAt), eq(nktables.nk.region, region)));
 	let mvalsP: MarkerEntryProps[] = [];
 	for (const mvdb of mvalsDB) {
 		const data = JSON.parse(mvdb.data as string);
@@ -318,11 +326,12 @@ async function getMvs(): Promise<Response> {
 	return json(mvalsP);
 }
 
-async function getCtrls(): Promise<Response> {
+async function getCtrls(region: string | null): Promise<Response> {
+	if (!region) return error(400, 'need region parameter');
 	let ctrlsDB = await db
 		.select()
 		.from(nktables.kontrollen)
-		.where(isNull(nktables.kontrollen.deletedAt));
+		.where(and(isNull(nktables.kontrollen.deletedAt), eq(nktables.kontrollen.region, region)));
 	let ctrls: ControlEntry[] = [];
 	for (const ctrlDB of ctrlsDB) {
 		const data = JSON.parse(ctrlDB.data as string);
@@ -395,9 +404,10 @@ async function removeDuplicates(): Promise<Response> {
 // the get handler gets all change dates, or all mvs, or all ctrls, or one image
 export const GET: RequestHandler = async ({ url }) => {
 	const what = url.searchParams.get('what');
-	if (what == 'chg') return await getChgs();
-	if (what == 'nk') return await getMvs();
-	if (what == 'kn') return await getCtrls();
+	const region = url.searchParams.get('region');
+	if (what == 'chg') return await getChgs(region);
+	if (what == 'nk') return await getMvs(region);
+	if (what == 'ctrls') return await getCtrls(region);
 	if (what == 'img') return await getImage(url.searchParams.get('imgPath'));
 	if (what == 'dpl') return await removeDuplicates();
 	return json([]);

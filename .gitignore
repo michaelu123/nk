@@ -26,5 +26,6 @@ README.MUH.md
 README.MUH copy.md
 images/*
 src/lib/assets/bilder.html
-src/lib/test.ts
+**/test*/*
+**/test*.*
 *.txt

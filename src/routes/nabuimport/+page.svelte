@@ -113,7 +113,7 @@
 			const name = r[nameIndex].toString();
 			const typ = nbmap(r[typIndex]);
 			const comment = r[commentIndex];
-			const lat = parseFloat(r[latIndex].replace(',', '.')); // TODO: check if within bounds
+			const lat = parseFloat(r[latIndex].replace(',', '.')); // TODO: check if within bounds?
 			const lng = parseFloat(r[lngIndex].replace(',', '.'));
 			const aufgehängt = r[aufgehängtIndex];
 			const abgehängt = r[abgehängtIndex];
@@ -131,6 +131,7 @@
 				lastCleaned: null,
 				id,
 				name,
+				region: nkState.selectedRegion!,
 				nkType: typ,
 				comment,
 				image: image || null,
@@ -185,6 +186,7 @@
 					id,
 					nkid,
 					name,
+					region: nkState.selectedRegion!,
 					date,
 					species,
 					comment,

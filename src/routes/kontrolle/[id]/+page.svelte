@@ -19,6 +19,7 @@
 		id: 'mv' + data.id + '_' + Date.now().toString(),
 		nkid: data.id, // mv?.id ?
 		name: '',
+		region: nkState.selectedRegion!,
 		date: today,
 		species: '',
 		comment: '',

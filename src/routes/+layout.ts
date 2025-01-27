@@ -3,7 +3,7 @@ import { browser } from '$app/environment';
 import { openDB, type IDBPDatabase, wrap } from 'idb';
 import { getDirectory, getfs } from '$lib/fs';
 import { redirect } from '@sveltejs/kit';
-import type { Region } from '$lib/state.svelte';
+import { type Region } from '$lib/state.svelte';
 
 let useBucketsAnyways = true; // TODO configurable
 let useIndexedDbAnyways = true; // TODO configurable
@@ -37,8 +37,10 @@ async function getStorage(): Promise<{ idb: any; bucket: any }> {
 					request.onupgradeneeded = (ev: any) => {
 						const db = ev.target.result;
 						db.createObjectStore('settings');
-						db.createObjectStore('nk');
-						db.createObjectStore('kontrollen');
+						const dbnk = db.createObjectStore('nk');
+						dbnk.createIndex('nkRegionIndex', 'region');
+						const dbkn = db.createObjectStore('kontrollen');
+						dbkn.createIndex('nkRegionIndex', 'region');
 					};
 					request.onsuccess = () => resolve(request.result);
 					request.onerror = () => reject(request.error);
@@ -67,8 +69,10 @@ async function getStorage(): Promise<{ idb: any; bucket: any }> {
 			let idb: IDBPDatabase | null = await openDB('NK', 1, {
 				upgrade(db) {
 					db.createObjectStore('settings');
-					db.createObjectStore('nk');
-					db.createObjectStore('kontrollen');
+					const dbnk = db.createObjectStore('nk');
+					dbnk.createIndex('nkRegionIndex', 'region');
+					const dbkn = db.createObjectStore('kontrollen');
+					dbkn.createIndex('nkRegionIndex', 'region');
 				}
 			});
 			console.log('Using IndexedDb');
@@ -102,27 +106,30 @@ async function getRootDir(): Promise<FileSystemDirectoryEntry | null> {
 
 export const load: LayoutLoad = async ({ data, url, fetch }) => {
 	console.log('+layout.ts', browser, url);
-	const { user } = data;
+	const { user, regionsDB } = data;
 	if (browser) {
+		let regionIdb: Region | null = null;
+		let regionsIdb: Region[] | null = null;
+		let selectedRegion: string | null = null;
 		let { idb, bucket } = await getStorage();
 		let rootDir = await getRootDir();
 
-		const regionsJS = idb ? await idb.get('settings', 'regions') : localStorage.getItem('_regions');
-		const regionShortName = idb
-			? await idb.get('settings', 'regionshortname')
-			: localStorage.getItem('_regionshortname');
-		try {
-			const regions: Region[] = JSON.parse(regionsJS || '[]');
-			let region: Region | null | undefined = regions.find((r) => r.shortName == regionShortName);
+		selectedRegion = idb
+			? await idb.get('settings', 'selectedRegion')
+			: localStorage.getItem('_selectedRegion');
 
-			if (!region) {
-				if (url.pathname != '/region') {
-					return redirect(303, '/region');
-				}
+		regionsIdb = idb
+			? await idb.get('settings', 'regions')
+			: (JSON.parse(localStorage.getItem('_regions') || '[]') as Region[]);
+		regionIdb = (regionsIdb || []).find((r) => r.shortName == selectedRegion) ?? null;
+
+		if (!regionsIdb || regionsIdb.length == 0 || !selectedRegion) {
+			if (url.pathname != '/region') {
+				console.log('redirect1 /region');
+				return redirect(307, '/region');
 			}
-			return { idb, bucket, user, rootDir, region, regions, fetch };
-		} catch (e) {
-			return { idb, bucket, user, rootDir, fetch };
 		}
+
+		return { idb, bucket, user, rootDir, regionIdb, selectedRegion, regionsIdb, regionsDB, fetch };
 	}
 };

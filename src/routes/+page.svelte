@@ -8,7 +8,7 @@
 		Progressbar
 	} from 'svelte-5-ui-lib';
 	import { page } from '$app/stores';
-	import { getState, MarkerEntry } from '$lib/state.svelte';
+	import { getState, MarkerEntry, State } from '$lib/state.svelte';
 	import { goto } from '$app/navigation';
 
 	import {
@@ -33,9 +33,10 @@
 	let nkState = getState();
 	let { data } = $props();
 	let { rootDir, fetch } = data;
-	let { region } = $derived(nkState);
+	console.log('xxxdata', data);
 
-	let { markerValues, maxBounds, defaultCenter, defaultZoom, isLoading } = $derived(nkState);
+	let { region, markerValues, maxBounds, defaultCenter, defaultZoom, isLoading } =
+		$derived(nkState);
 
 	// sidebar stuff
 	let activeUrl = $state($page.url.pathname);
@@ -53,7 +54,7 @@
 
 	let selectedMarkerIndex = -1;
 	// svelte-ignore state_referenced_locally
-	nkState.region = region!;
+	nkState.region = region || State.regionDefault;
 	let currPos = $state(nkState.region.center);
 	let radius = $state(100);
 	let followingGPS = $state(false);
