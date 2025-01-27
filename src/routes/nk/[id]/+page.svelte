@@ -147,9 +147,9 @@
 					>Speichern und Bild aufnehmen</Button
 				>
 			{/if}
+			<Button class="m-1" onclick={setStateBack}>Nicht speichern</Button>
+			<Button class="m-1" onclick={goBack}>Zurück zur Karte</Button>
 			{#if mv.name && mv.nkType}
-				<Button class="m-1" onclick={setStateBack}>Nicht speichern</Button>
-				<Button class="m-1" onclick={goBack}>Zurück zur Karte</Button>
 				<Button class="m-1" onclick={takePhoto}>Neues Bild aufnehmen</Button>
 			{/if}
 		{:else}

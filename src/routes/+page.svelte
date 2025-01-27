@@ -33,7 +33,6 @@
 	let nkState = getState();
 	let { data } = $props();
 	let { rootDir, fetch } = data;
-	console.log('xxxdata', data);
 
 	let { region, markerValues, maxBounds, defaultCenter, defaultZoom, isLoading } =
 		$derived(nkState);

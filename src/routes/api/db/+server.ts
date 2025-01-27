@@ -294,7 +294,7 @@ async function getChgs(region: string | null): Promise<Response> {
 			deletedAt: nktables.kontrollen.deletedAt
 		})
 		.from(nktables.kontrollen)
-		.where(and(isNull(nktables.nk.deletedAt), eq(nktables.nk.region, region!)));
+		.where(and(isNull(nktables.kontrollen.deletedAt), eq(nktables.kontrollen.region, region!)));
 
 	for (const cchange of cchanges) {
 		const data = JSON.parse(cchange.data!);

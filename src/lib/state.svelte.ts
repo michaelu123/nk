@@ -62,13 +62,9 @@ export class MarkerEntry implements MarkerEntryProps {
 		this.deletedAt = typeof data.deletedAt == 'string' ? new Date(data.deletedAt) : data.deletedAt;
 	}
 
-	toObj(): MarkerEntryProps {
-		let obj: MarkerEntryProps = {
-			latLng: this.latLng,
-			ctrls: null,
-			selected: false,
-			color: this.color,
-			lastCleaned: this.lastCleaned,
+	toObj(): any {
+		let obj = {
+			latLng: [...this.latLng], // "un"state
 			id: this.id,
 			name: this.name,
 			region: this.region,
@@ -84,13 +80,7 @@ export class MarkerEntry implements MarkerEntryProps {
 
 	mv2str() {
 		const obj = this.toObj();
-		const js = JSON.stringify(obj, (k, v) => {
-			if (k == 'ctrls') return undefined;
-			if (k == 'selected') return undefined;
-			if (k == 'color') return undefined;
-			if (k == 'lastCleaned') return undefined;
-			return v;
-		});
+		const js = JSON.stringify(obj);
 		return js;
 	}
 
@@ -454,13 +444,14 @@ export class State implements StateProps {
 		// this.defaultCenter = center; //  does not trigger state change!?
 		this.defaultCenter = center;
 		this.defaultZoom = zoom;
-		this.storeSettings('center', this.defaultCenter);
+		this.storeSettings('center', [...center]); // "unstate" if center is a $state variable
 	}
 
 	async storeMv(mv: MarkerEntry) {
 		if (this.idb) {
+			const obj = mv.toObj();
 			try {
-				await this.idb.put('nk', mv, mv.id);
+				await this.idb.put('nk', obj, mv.id);
 			} catch (e: any) {
 				console.log('err idb.put', e);
 			}

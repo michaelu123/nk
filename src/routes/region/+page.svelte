@@ -5,11 +5,15 @@
 	import { onMount } from 'svelte';
 	import { Button, Input, Label, Range, Select } from 'svelte-5-ui-lib';
 
+	const xFactor = 3000;
+	const yFactor = 4000;
+
 	let nkState = getState();
 	let { regions, region } = $derived(nkState);
 
 	let map: any = $state(null);
 	let center = $state(nkState.region?.center || State.regionDefault.center);
+	$inspect('center', center);
 	let zoom = $state(16);
 	let xoff = $state(6);
 	let yoff = $state(6);
@@ -19,8 +23,8 @@
 		region && !isEditMode
 			? [region.lowerLeft, region.upperRight]
 			: [
-					[center[0] + yoff / 5000, center[1] - xoff / 3000],
-					[center[0] - yoff / 5000, center[1] + xoff / 3000]
+					[center[0] + yoff / yFactor, center[1] - xoff / xFactor],
+					[center[0] - yoff / yFactor, center[1] + xoff / xFactor]
 				]
 	);
 	// svelte-ignore state_referenced_locally
@@ -101,8 +105,8 @@
 				yoff = 6;
 			} else {
 				center = region!.center;
-				xoff = (center[1] - region!.lowerLeft[1]) * 3000;
-				yoff = (region!.lowerLeft[0] - center[0]) * 5000;
+				xoff = (center[1] - region!.lowerLeft[1]) * xFactor;
+				yoff = (region!.lowerLeft[0] - center[0]) * yFactor;
 			}
 		}
 		isEditMode = !isEditMode;

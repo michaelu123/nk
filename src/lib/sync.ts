@@ -156,14 +156,17 @@ export class Sync {
 		}
 		this.nkState.fetchData();
 		this.setProgress(0);
-		return fromCnt;
+		return cnt;
 	}
 
 	async sync() {
 		const counters = new Map<string, any>();
+
+		// save current selectedRegion
+		const selRegion = this.nkState.selectedRegion;
+		// sync regions between client and server
 		await this.storeLoadRegions();
-		// clear local data
-		await this.clearDb();
+		// store changed or new client values on server
 		for (const region of this.nkState.regions) {
 			this.shortName = region.shortName;
 			this.nkState.selectedRegion = region.shortName;
@@ -171,13 +174,22 @@ export class Sync {
 			const csMap = new Map<string, CmpResult>(); // client: newer or new on client
 			this.nkCount = 0;
 			this.ctrlsCount = 0;
-
 			const toCnt = await this.toServer();
-
-			const fromCnt = this.fromServer();
-			await sleep(100);
-			counters.set(region.name, { toCnt, fromCnt, nkCnt: this.nkCount, ctrlCnt: this.ctrlsCount });
+			counters.set(region.name, { nk: this.nkCount, ctrls: this.ctrlsCount, to: toCnt });
 		}
+		// clear local data
+		await this.clearDb(); // only nk and kontrollen
+		// load server data anew into client
+		for (const region of this.nkState.regions) {
+			this.shortName = region.shortName;
+			this.nkState.selectedRegion = region.shortName;
+			const fromCnt = await this.fromServer();
+			const ctrs = counters.get(region.name);
+			ctrs.fromCnt = fromCnt;
+		}
+		// restore current selectedRegion
+		this.nkState.selectedRegion = selRegion;
+		await sleep(100);
 
 		// 		alert(`Datensätze zum Server übertragen: ${toCnt}
 		// Datensätze vom Server neu geholt: ${fromCnt}
@@ -186,7 +198,7 @@ export class Sync {
 		// Bilder zum Server übertragen: ${this.imgToCnt}
 		// Bilder vom Server geholt: ${this.imgFromCnt}
 		// `);
-		alert('data transfers' + JSON.stringify(counters)); // TODO
+		alert('data transfers' + JSON.stringify(counters.entries().toArray())); // TODO
 	}
 
 	async postImage(imgPath: string) {
