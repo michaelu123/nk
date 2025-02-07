@@ -2,7 +2,7 @@
 	import { goto } from '$app/navigation';
 	import ProposedInput from '$lib/components/ProposedInput.svelte';
 	import NKControl from '$lib/components/NKControl.svelte';
-	import { getState, MarkerEntry, type ControlEntry } from '$lib/state.svelte';
+	import { getState, type ControlEntry, type MarkerEntry } from '$lib/state.svelte';
 	import { redirect, error } from '@sveltejs/kit';
 	import { Textarea, Label, Button, Input, Card, Checkbox, Spinner } from 'svelte-5-ui-lib';
 	import { fetchBlobUrl } from '$lib/fs.js';
@@ -48,7 +48,7 @@
 		today.setMilliseconds(0);
 
 		const id = today.valueOf().toString();
-		const mv = new MarkerEntry({
+		const mv = {
 			latLng: [lat, lng],
 			ctrls: [],
 			selected: false,
@@ -63,7 +63,7 @@
 			createdAt: today,
 			changedAt: null,
 			deletedAt: null
-		});
+		} as MarkerEntry;
 		return mv;
 	}
 

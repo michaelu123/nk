@@ -8,7 +8,7 @@
 		Progressbar
 	} from 'svelte-5-ui-lib';
 	import { page } from '$app/stores';
-	import { getState, MarkerEntry, State } from '$lib/state.svelte';
+	import { getState, State, type MarkerEntry } from '$lib/state.svelte';
 	import { goto } from '$app/navigation';
 
 	import {

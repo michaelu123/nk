@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import NKControl from '$lib/components/NKControl.svelte';
-	import { getState, type ControlEntry } from '$lib/state.svelte';
+	import { getState, mv2str, type ControlEntry } from '$lib/state.svelte';
 	import { redirect } from '@sveltejs/kit';
 	import { Card } from 'svelte-5-ui-lib';
 
@@ -33,11 +33,11 @@
 	// Another effect hack: mv appears eventually, and only then do I want to init name, nkType etc.
 	// when saving, I do not want this effect. So I call setStateBack in the effect only once..
 	$effect(() => {
-		console.log('1eff', mv ? mv.mv2str() : 'undef');
+		console.log('1eff', mv ? mv2str(mv) : 'undef');
 		if (mv && markerValues) {
 			ctrl.name = mv!.name;
 		}
-		console.log('2eff', mv ? mv.mv2str() : 'undef');
+		console.log('2eff', mv ? mv2str(mv) : 'undef');
 	});
 
 	function cb() {

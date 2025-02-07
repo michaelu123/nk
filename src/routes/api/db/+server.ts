@@ -1,4 +1,4 @@
-import { type ControlEntry, type MarkerEntryProps, type Region } from '$lib/state.svelte';
+import { type ControlEntry, type MarkerEntry, type Region } from '$lib/state.svelte';
 import { type RequestHandler, error, json } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
 import * as nktables from '$lib/server/db/schema';
@@ -17,14 +17,14 @@ import { dirname, join } from 'node:path';
 import { IMAGE_ROOTDIR } from '$env/static/private';
 // import { read } from '$app/server'; does not work
 
-function toNk(mvP: MarkerEntryProps, username: string, region: string): NKDbInsert {
+function toNk(mv: MarkerEntry, username: string, region: string): NKDbInsert {
 	return {
-		id: +mvP.id,
+		id: +mv.id,
 		username,
 		region,
-		data: mv2DBStr(mvP, false),
-		createdAt: mvP.createdAt ? new Date(mvP.createdAt) : null,
-		changedAt: mvP.changedAt ? new Date(mvP.changedAt) : null,
+		data: mv2DBStr(mv, false),
+		createdAt: mv.createdAt ? new Date(mv.createdAt) : null,
+		changedAt: mv.changedAt ? new Date(mv.changedAt) : null,
 		deletedAt: null
 	};
 }
@@ -47,8 +47,8 @@ function toKontrollen(
 	};
 }
 
-function findMvCtrl(mvP: MarkerEntryProps, id: string): ControlEntry | null {
-	const ctrls = mvP.ctrls || [];
+function findMvCtrl(mv: MarkerEntry, id: string): ControlEntry | null {
+	const ctrls = mv.ctrls || [];
 	for (const ctrl of ctrls) {
 		if (ctrl.id == id) return ctrl;
 	}
@@ -62,7 +62,7 @@ function findDbCtrl(dbctrls: CtrlDbSelect[], id: number): CtrlDbSelect | null {
 	return null;
 }
 
-async function mvinsert(mv: MarkerEntryProps, username: string, region: string): Promise<number> {
+async function mvinsert(mv: MarkerEntry, username: string, region: string): Promise<number> {
 	const data = mv2str(mv);
 	const values: NKDbInsert = {
 		username,
@@ -99,7 +99,7 @@ async function ctrlinsert(
 	ctrlIds.push({ newid: id, oldid: ctrl.id });
 }
 
-function mv2str(mv: MarkerEntryProps): string {
+function mv2str(mv: MarkerEntry): string {
 	const js = JSON.stringify(mv, (k, v) => {
 		if (k == 'id') return undefined;
 		if (k == 'ctrls') return undefined;
@@ -122,54 +122,54 @@ async function postMv(
 ): Promise<Response> {
 	if (!region) return error(400, 'need region parameter');
 
-	const mvP = (await request.json()) as MarkerEntryProps;
+	const mv = (await request.json()) as MarkerEntry;
 
-	const [mvDb] = await db.select().from(nktables.nk).where(eq(nktables.nk.id, +mvP.id));
+	const [mvDb] = await db.select().from(nktables.nk).where(eq(nktables.nk.id, +mv.id));
 
 	// case 1: mv not yet in the db, insert unless deleted
 	if (!mvDb) {
-		if (mvP.deletedAt) {
+		if (mv.deletedAt) {
 			// client can delete this entry
-			return json({ delete: { oldid: mvP.id } }, { status: 200 });
+			return json({ delete: { oldid: mv.id } }, { status: 200 });
 		}
-		const id = await mvinsert(mvP, username, region);
+		const id = await mvinsert(mv, username, region);
 		const ctrlIds: Object[] = [];
-		for (const ctrl of mvP.ctrls || []) {
+		for (const ctrl of mv.ctrls || []) {
 			await ctrlinsert(id, ctrl, username, region, ctrlIds);
 		}
 		// client must update id's
-		return json({ updateids: { newid: id, oldid: mvP.id, ctrls: ctrlIds } }, { status: 200 });
+		return json({ updateids: { newid: id, oldid: mv.id, ctrls: ctrlIds } }, { status: 200 });
 	}
 
 	// case 2: marker in the db, but deletedAt is set
 	// in the db mark as deleted
-	if (mvDb && mvP.deletedAt) {
-		const deletedAt = new Date(mvP.deletedAt);
+	if (mvDb && mv.deletedAt) {
+		const deletedAt = new Date(mv.deletedAt);
 		await db
 			.update(nktables.kontrollen)
 			.set({ deletedAt })
-			.where(eq(nktables.kontrollen.nkid, +mvP.id));
-		await db.update(nktables.nk).set({ deletedAt }).where(eq(nktables.nk.id, +mvP.id));
-		return json({ delete: { oldid: mvP.id } }, { status: 200 });
+			.where(eq(nktables.kontrollen.nkid, +mv.id));
+		await db.update(nktables.nk).set({ deletedAt }).where(eq(nktables.nk.id, +mv.id));
+		return json({ delete: { oldid: mv.id } }, { status: 200 });
 	}
 
 	// case 3: marker in the db, must merge dependent on changedAt
 	const dbChanged = lastChanged(mvDb);
-	const mvPChanged = lastChanged(mvP);
-	if (dbChanged < mvPChanged) {
+	const mvChanged = lastChanged(mv);
+	if (dbChanged < mvChanged) {
 		await db
 			.update(nktables.nk)
-			.set(toNk(mvP, username, region))
-			.where(eq(nktables.nk.id, +mvP.id));
+			.set(toNk(mv, username, region))
+			.where(eq(nktables.nk.id, +mv.id));
 	}
 
 	let dbCtrls = (await db
 		.select()
 		.from(nktables.kontrollen)
-		.where(eq(nktables.kontrollen.nkid, +mvP.id))) as CtrlDbSelect[];
+		.where(eq(nktables.kontrollen.nkid, +mv.id))) as CtrlDbSelect[];
 
 	for (const dbCtrl of dbCtrls) {
-		const mvCtrl = findMvCtrl(mvP, dbCtrl.id.toString());
+		const mvCtrl = findMvCtrl(mv, dbCtrl.id.toString());
 		if (!mvCtrl) continue;
 		const dbChanged = lastChanged(dbCtrl);
 		const mvChanged = lastChanged(mvCtrl);
@@ -181,7 +181,7 @@ async function postMv(
 		}
 	}
 	const ctrlIds: Object[] = [];
-	for (const mvCtrl of mvP.ctrls || []) {
+	for (const mvCtrl of mv.ctrls || []) {
 		const dbCtrl = findDbCtrl(dbCtrls, +mvCtrl.id);
 		if (!dbCtrl) {
 			await ctrlinsert(mvDb.id, mvCtrl, username, region, ctrlIds);
@@ -316,14 +316,14 @@ async function getMvs(region: string | null): Promise<Response> {
 		.select()
 		.from(nktables.nk)
 		.where(and(isNull(nktables.nk.deletedAt), eq(nktables.nk.region, region)));
-	let mvalsP: MarkerEntryProps[] = [];
+	let meVals: MarkerEntry[] = [];
 	for (const mvdb of mvalsDB) {
 		const data = JSON.parse(mvdb.data as string);
 		mvdb.data = data;
-		const mvP = flattenObj(mvdb, {});
-		mvalsP.push(mvP);
+		const mv = flattenObj(mvdb, {});
+		meVals.push(mv);
 	}
-	return json(mvalsP);
+	return json(meVals);
 }
 
 async function getCtrls(region: string | null): Promise<Response> {
@@ -365,7 +365,7 @@ async function nkDelete(id: number) {
 async function removeDuplicates(): Promise<Response> {
 	let mvalArr: any = [];
 	let count = 0;
-	let mvals = await db
+	let mvalsDB = await db
 		.select({
 			id: nktables.nk.id,
 			data: nktables.nk.data,
@@ -374,10 +374,10 @@ async function removeDuplicates(): Promise<Response> {
 			deletedAt: nktables.nk.deletedAt
 		})
 		.from(nktables.nk);
-	for (const mval of mvals) {
-		const data: any = JSON.parse(mval.data!);
-		let lc = lastChanged(mval);
-		mvalArr.push({ id: mval.id, lastChanged: lc, lat: data.latLng[0], lng: data.latLng[1] });
+	for (const mvdb of mvalsDB) {
+		const data: any = JSON.parse(mvdb.data!);
+		let lc = lastChanged(mvdb);
+		mvalArr.push({ id: mvdb.id, lastChanged: lc, lat: data.latLng[0], lng: data.latLng[1] });
 	}
 	mvalArr = mvalArr.toSorted((a: any, b: any) => {
 		if (a.lat == b.lat) return a.lng - b.lng;

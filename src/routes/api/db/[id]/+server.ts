@@ -27,6 +27,6 @@ export const GET: RequestHandler = async ({ params }) => {
 
 	(mvdb as any).ctrls = ctrls;
 
-	const mvP = flattenObj(mvdb, {});
-	return json(mvP);
+	const mv = flattenObj(mvdb, {});
+	return json(mv);
 };
