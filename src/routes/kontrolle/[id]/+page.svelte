@@ -1,23 +1,23 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import NKControl from '$lib/components/NKControl.svelte';
-	import { getState, mv2str, type ControlEntry } from '$lib/state.svelte';
+	import { getState, nk2str, type ControlEntry } from '$lib/state.svelte';
 	import { redirect } from '@sveltejs/kit';
 	import { Card } from 'svelte-5-ui-lib';
 
 	let nkState = getState();
-	let { nkSpecies, markerValues, isLoading } = $derived(nkState);
+	let { nkSpecies, nkValues, isLoading } = $derived(nkState);
 	let { data } = $props();
 	if (!data.id) {
 		redirect(302, '/');
 	}
-	let mvid = $derived(data.id);
-	let mv = $derived(markerValues.find((m) => m.id == mvid));
+	let nkid = $derived(data.id);
+	let nk = $derived(nkValues.find((m) => m.id == nkid));
 	let today = new Date();
 	today.setMilliseconds(0);
 	let ctrl: ControlEntry = $state({
-		id: 'mv' + data.id + '_' + Date.now().toString(),
-		nkid: data.id, // mv?.id ?
+		id: 'nk' + data.id + '_' + Date.now().toString(),
+		nkid: data.id, // nk?.id ?
 		name: '',
 		region: nkState.selectedRegion!,
 		date: today,
@@ -30,36 +30,36 @@
 		deletedAt: null
 	});
 
-	// Another effect hack: mv appears eventually, and only then do I want to init name, nkType etc.
+	// Another effect hack: nk appears eventually, and only then do I want to init name, nkType etc.
 	// when saving, I do not want this effect. So I call setStateBack in the effect only once..
 	$effect(() => {
-		console.log('1eff', mv ? mv2str(mv) : 'undef');
-		if (mv && markerValues) {
-			ctrl.name = mv!.name;
+		console.log('1eff', nk ? nk2str(nk) : 'undef');
+		if (nk && nkValues) {
+			ctrl.name = nk!.name;
 		}
-		console.log('2eff', mv ? mv2str(mv) : 'undef');
+		console.log('2eff', nk ? nk2str(nk) : 'undef');
 	});
 
 	function cb() {
-		goto('/nk/' + mvid);
+		goto('/nk/' + nkid);
 	}
 </script>
 
-{#if mv}
+{#if nk}
 	<div id="details" class="overflow-x-clip">
 		<h1 class="my-8 text-center text-2xl font-semibold">Nistkasten Kontrolle</h1>
 		<Card class="m-4" size="xl">
 			<div class="mb-4 flex">
 				<p class="w-40 shrink-0 font-bold">Name</p>
-				<p>{mv.name}</p>
+				<p>{nk.name}</p>
 			</div>
 			<div class="mb-4 flex">
 				<p class="w-40 shrink-0 font-bold">Typ</p>
-				<p>{mv.nkType}</p>
+				<p>{nk.nkType}</p>
 			</div>
 		</Card>
 
-		<NKControl {mv} {ctrl} {nkSpecies} {cb} />
+		<NKControl {nk} {ctrl} {nkSpecies} {cb} />
 	</div>
 {:else if isLoading}
 	<div class="flex h-screen w-screen flex-col items-center justify-center gap-8">

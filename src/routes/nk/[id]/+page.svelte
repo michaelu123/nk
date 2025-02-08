@@ -2,13 +2,13 @@
 	import { goto } from '$app/navigation';
 	import ProposedInput from '$lib/components/ProposedInput.svelte';
 	import NKControl from '$lib/components/NKControl.svelte';
-	import { getState, type ControlEntry, type MarkerEntry } from '$lib/state.svelte';
+	import { getState, type ControlEntry, type NkEntry } from '$lib/state.svelte';
 	import { redirect, error } from '@sveltejs/kit';
 	import { Textarea, Label, Button, Input, Card, Checkbox, Spinner } from 'svelte-5-ui-lib';
 	import { fetchBlobUrl } from '$lib/fs.js';
 
 	let nkState = getState();
-	let { nkTypes, nkSpecies, markerValues, isLoading } = $derived(nkState);
+	let { nkTypes, nkSpecies, nkValues, isLoading } = $derived(nkState);
 	let { data } = $props();
 	if (!data.id) {
 		redirect(302, '/');
@@ -16,7 +16,7 @@
 	let id = $state(data.id);
 	let nknew = $state(data.id == 'new');
 	const ll = data.url.searchParams.get('ll') || '';
-	let mv = $derived(nknew ? newMV(ll) : markerValues.find((m) => m.id == id));
+	let nk = $derived(nknew ? newNK(ll) : nkValues.find((m) => m.id == id));
 	const sp = data.url.searchParams.toString();
 	let change = $state(sp.includes('change'));
 	// svelte-ignore state_referenced_locally
@@ -33,13 +33,13 @@
 	let cleaned = $state(true);
 
 	async function fetchImage(): Promise<string> {
-		if (mv && mv.image && data.rootDir) {
-			return await fetchBlobUrl(data.rootDir, mv.image);
+		if (nk && nk.image && data.rootDir) {
+			return await fetchBlobUrl(data.rootDir, nk.image);
 		}
 		return '';
 	}
 
-	function newMV(coords?: string): MarkerEntry {
+	function newNK(coords?: string): NkEntry {
 		if (!coords) error(404, 'missing parameter ll=lat,lng');
 		const latlng = coords.split(',');
 		const lat = +latlng[0],
@@ -48,7 +48,7 @@
 		today.setMilliseconds(0);
 
 		const id = today.valueOf().toString();
-		const mv = {
+		const nk = {
 			latLng: [lat, lng],
 			ctrls: [],
 			selected: false,
@@ -63,26 +63,26 @@
 			createdAt: today,
 			changedAt: null,
 			deletedAt: null
-		} as MarkerEntry;
-		return mv;
+		} as NkEntry;
+		return nk;
 	}
 
-	// Another effect hack: mv appears eventually, and only then do I want to init name, nkType etc.
+	// Another effect hack: nk appears eventually, and only then do I want to init name, nkType etc.
 	// when saving, I do not want this effect. So I call setStateBack in the effect only once..
 	$effect(() => {
-		// console.log('1eff', mv ? mv.mv2str() : 'undef', inited);
-		if (mv && markerValues && !inited) {
+		// console.log('1eff', nk ? nk.nk2str() : 'undef', inited);
+		if (nk && nkValues && !inited) {
 			setStateBack();
 			inited = true;
 		}
-		// console.log('2eff', mv ? mv.mv2str() : 'undef', inited);
+		// console.log('2eff', nk ? nk.nk2str() : 'undef', inited);
 	});
 
 	function setStateBack() {
-		name = mv!.name;
-		nkType = mv!.nkType;
-		comment = mv!.comment;
-		image = mv!.image ?? '';
+		name = nk!.name;
+		nkType = nk!.nkType;
+		comment = nk!.comment;
+		image = nk!.image ?? '';
 		isEditMode = inited ? false : nknew || change;
 	}
 
@@ -92,22 +92,22 @@
 	}
 
 	async function toggleEditModeAndSaveToDatabase(takePhoto: boolean) {
-		if (isEditMode && mv) {
+		if (isEditMode && nk) {
 			if (!name) errName = 'Bitte Namen vergeben';
 			if (!nkType) errType = 'Bitte Nistkastentyp vergeben';
 			if (!name || !nkType) return;
-			await nkState.persistNK(mv, { name, nkType, comment, image });
+			await nkState.persistNK(nk, { name, nkType, comment, image });
 			if (nknew) {
-				markerValues.push(mv);
+				nkValues.push(nk);
 			}
 			if (nknew && cleaned) {
 				const today = new Date();
 				today.setMilliseconds(0);
 				const ctrl: ControlEntry = {
-					id: 'mv' + mv.id + '_' + Date.now().toString(),
-					nkid: mv.id,
-					name: mv.name,
-					region: mv.region,
+					id: 'nk' + nk.id + '_' + Date.now().toString(),
+					nkid: nk.id,
+					name: nk.name,
+					region: nk.region,
 					date: today,
 					species: null,
 					comment: 'Neu aufgehängt',
@@ -117,12 +117,12 @@
 					changedAt: null,
 					deletedAt: null
 				};
-				mv.ctrls = [ctrl];
-				nkState.persistCtrl(mv, ctrl, {});
+				nk.ctrls = [ctrl];
+				nkState.persistCtrl(nk, ctrl, {});
 			}
 			nkState.updNkTypes(nkType);
 			if (nknew && takePhoto) {
-				goto(`/photo?mvid=${mv.id}&nkname=${mv.name}`);
+				goto(`/photo?nkid=${nk.id}&nkname=${nk.name}`);
 			} else {
 				goBack();
 			}
@@ -134,11 +134,11 @@
 		if (!name) errName = 'Bitte Namen vergeben';
 		if (!nkType) errType = 'Bitte Nistkastentyp vergeben';
 		if (!name || !nkType) return;
-		goto(`/photo?mvid=${mv!.id}&nkname=${mv!.name}`);
+		goto(`/photo?nkid=${nk!.id}&nkname=${nk!.name}`);
 	}
 </script>
 
-{#snippet buttons(mv: MarkerEntry)}
+{#snippet buttons(nk: NkEntry)}
 	<div class="mb-1 ml-4 mt-0 text-left">
 		{#if isEditMode}
 			<Button class="m-1" onclick={() => toggleEditModeAndSaveToDatabase(false)}>Speichern</Button>
@@ -149,18 +149,18 @@
 			{/if}
 			<Button class="m-1" onclick={setStateBack}>Nicht speichern</Button>
 			<Button class="m-1" onclick={goBack}>Zurück zur Karte</Button>
-			{#if mv.name && mv.nkType}
+			{#if nk.name && nk.nkType}
 				<Button class="m-1" onclick={takePhoto}>Neues Bild aufnehmen</Button>
 			{/if}
 		{:else}
 			<Button class="m-1" onclick={() => toggleEditModeAndSaveToDatabase(false)}>Ändern</Button>
 			<Button class="m-1" onclick={goBack}>Zurück zur Karte</Button>
-			<Button class="m-1" href={'/kontrolle/' + mv.id}>Neue Kontrolle</Button>
+			<Button class="m-1" href={'/kontrolle/' + nk.id}>Neue Kontrolle</Button>
 		{/if}
 	</div>
 {/snippet}
 
-{#if mv}
+{#if nk}
 	<div id="details" class="overflow-x-clip">
 		<h1 class="my-1 text-center text-2xl font-semibold">Nistkasten</h1>
 		{#if !nknew}
@@ -203,35 +203,35 @@
 					</div>
 				{/if}
 			</form>
-			{@render buttons(mv)}
+			{@render buttons(nk)}
 		{:else}
 			<Card class="m-1" size="xl">
 				<div class="mb-4 flex">
 					<p class="w-40 shrink-0 font-bold">Name</p>
-					<p>{mv.name}</p>
+					<p>{nk.name}</p>
 				</div>
 				<div class="mb-4 flex">
 					<p class="w-40 shrink-0 font-bold">Typ</p>
-					<p>{mv.nkType}</p>
+					<p>{nk.nkType}</p>
 				</div>
 				<div class="mb-4 flex">
 					<p class="w-40 shrink-0 font-bold">Zuletzt geputzt</p>
 					<p>
-						{mv.lastCleaned ? new Date(mv.lastCleaned!).toLocaleDateString() : ''}
+						{nk.lastCleaned ? new Date(nk.lastCleaned!).toLocaleDateString() : ''}
 					</p>
 				</div>
 				<div class="mb-4 flex">
 					<p class="w-40 shrink-0 font-bold">Bemerkungen</p>
-					<Textarea name="comment" id="comment_id" value={mv.comment} readonly rows={2}></Textarea>
+					<Textarea name="comment" id="comment_id" value={nk.comment} readonly rows={2}></Textarea>
 				</div>
-				{@render buttons(mv)}
+				{@render buttons(nk)}
 			</Card>
 		{/if}
 
-		{#if !isEditMode && mv.ctrls}
+		{#if !isEditMode && nk.ctrls}
 			<h1 class="m-2 text-lg font-bold">Kontrollen:</h1>
-			{#each mv.ctrls ?? [] as ctrl (ctrl.id)}
-				<NKControl {mv} {ctrl} {nkSpecies} cb={null} />
+			{#each nk.ctrls ?? [] as ctrl (ctrl.id)}
+				<NKControl {nk} {ctrl} {nkSpecies} cb={null} />
 			{/each}
 		{/if}
 	</div>

@@ -2,7 +2,7 @@
 	import CSV from '$lib/csv';
 	import { UploadOutline } from 'flowbite-svelte-icons';
 	import Dropzone from 'svelte-file-dropzone';
-	import { getState, type ControlEntry, type MarkerEntry } from '$lib/state.svelte';
+	import { getState, type ControlEntry, type NkEntry } from '$lib/state.svelte';
 	import { goto } from '$app/navigation';
 	import { Button } from 'svelte-5-ui-lib';
 	import { parse, HTMLElement } from 'node-html-parser';
@@ -123,7 +123,7 @@
 			if (image) {
 				image = '/nabu/' + image;
 			}
-			const mv = {
+			const nk = {
 				latLng: [lat, lng],
 				ctrls: [],
 				selected: false,
@@ -138,8 +138,8 @@
 				createdAt: aufgehängtDate,
 				changedAt: null,
 				deletedAt: null
-			} as MarkerEntry;
-			await nkState.importMV(mv);
+			} as NkEntry;
+			await nkState.importNk(nk);
 			cnt++;
 		}
 	}

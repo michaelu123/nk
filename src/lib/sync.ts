@@ -1,6 +1,6 @@
 import type { IDBPDatabase } from 'idb';
-import { type ControlEntry, type MarkerEntry, type Region, type State } from './state.svelte';
-import { lastChanged, mv2DBStr, sleep } from './utils';
+import { type ControlEntry, type NkEntry, type Region, type State } from './state.svelte';
+import { lastChanged, nk2DBStr, sleep } from './utils';
 import { createDirsFor, createFile, createWriter, existsFS, fetchBlob, writeFile } from './fs';
 import type { RegionsDbSelect } from './server/db/schema';
 
@@ -73,12 +73,12 @@ export class Sync {
 			csMap.set(idS, { cmp: cmp_server, imgFromServer, imgToServer: [] });
 		}
 
-		const meVals = await this.nkState.fetchMarkersProps(); // including deleted items
-		await this.nkState.fetchCtrlsProps(meVals);
+		const meVals = await this.nkState.fetchNks(true); // including deleted items
+		await this.nkState.fetchCtrls(meVals, true);
 
-		for (let mv of meVals) {
-			const cmpRes = await this.compareChanges(mv, scMap.get(mv.id) ?? null);
-			csMap.set(mv.id, cmpRes); // may overwrite entries set to server above
+		for (let nk of meVals) {
+			const cmpRes = await this.compareChanges(nk, scMap.get(nk.id) ?? null);
+			csMap.set(nk.id, cmpRes); // may overwrite entries set to server above
 		}
 		csMap.forEach((v, k) => {
 			if (v.imgFromServer.length != 0 || v.imgToServer.length != 0) return;
@@ -88,12 +88,12 @@ export class Sync {
 		let len = csMap.size;
 		let cnt = 0;
 		let toCnt = 0;
-		for (const [mvid, cmpRes] of csMap.entries()) {
-			const mv = meVals.find((m) => m.id == mvid)!;
-			console.assert(mv, 'cannot find NK data for nkid ' + mvid);
+		for (const [nkid, cmpRes] of csMap.entries()) {
+			const nk = meVals.find((m) => m.id == nkid)!;
+			console.assert(nk, 'cannot find NK data for nkid ' + nkid);
 			if (cmpRes.cmp & cmp_client) {
 				toCnt++;
-				await this.storeOnServer(mv);
+				await this.storeOnServer(nk);
 			}
 			for (const image of cmpRes.imgToServer) {
 				await this.postImage(image);
@@ -116,7 +116,7 @@ export class Sync {
 				'Content-Type': 'application/json'
 			}
 		});
-		const meVals = (await nkResponse.json()) as MarkerEntry[];
+		const meVals = (await nkResponse.json()) as NkEntry[];
 		const ctrlResponse = await this.fetch('/api/db?what=ctrls&region=' + this.shortName, {
 			method: 'GET',
 			headers: {
@@ -128,16 +128,16 @@ export class Sync {
 		const len = meVals.length + ctrls.length;
 		let fromCnt = len;
 		let cnt = 0;
-		for (const mv of meVals) {
+		for (const nk of meVals) {
 			if (this.idb) {
 				try {
-					const res = await this.idb.put('nk', mv, mv.id.toString());
+					const res = await this.idb.put('nk', nk, nk.id.toString());
 				} catch (e: any) {
 					console.log('err idb.put', e);
 				}
 			} else {
-				const js = mv2DBStr(mv, false);
-				localStorage.setItem(this.shortName + '_' + mv.id, js);
+				const js = nk2DBStr(nk, false);
+				localStorage.setItem(this.shortName + '_' + nk.id, js);
 			}
 			cnt++;
 			this.nkCount++;
@@ -190,9 +190,9 @@ export class Sync {
 		this.nkState.selectedRegion = selRegion;
 		await sleep(100);
 
-		// 		alert(`Datensätze zum Server übertragen: ${toCnt}
+		// alert(`Datensätze zum Server übertragen: ${toCnt}
 		// Datensätze vom Server neu geholt: ${fromCnt}
-		// Davon Datensätze für Nistkästen: ${this.mvalsCount}
+		// Davon Datensätze für Nistkästen: ${this.nkCount}
 		// und für Kontrollen: ${this.ctrlsCount}.
 		// Bilder zum Server übertragen: ${this.imgToCnt}
 		// Bilder vom Server geholt: ${this.imgFromCnt}
@@ -242,8 +242,8 @@ export class Sync {
 		}
 	}
 
-	async storeOnServer(mv: MarkerEntry) {
-		const js = mv2DBStr(mv, true);
+	async storeOnServer(nk: NkEntry) {
+		const js = nk2DBStr(nk, true);
 		const response = await fetch!('/api/db?what=nk&region=' + this.shortName, {
 			method: 'POST',
 			headers: {
@@ -253,29 +253,29 @@ export class Sync {
 		});
 	}
 
-	async compareChanges(mv: MarkerEntry, sc: ServerChanges | null): Promise<CmpResult> {
+	async compareChanges(nk: NkEntry, sc: ServerChanges | null): Promise<CmpResult> {
 		const imgFromServer: string[] = [];
 		const imgToServer: string[] = [];
 		let cmp = 0;
 
 		if (!sc) {
-			if (mv.image) imgToServer.push(mv.image);
-			for (const ctrl of mv.ctrls || []) {
+			if (nk.image) imgToServer.push(nk.image);
+			for (const ctrl of nk.ctrls || []) {
 				if (ctrl.image) imgToServer.push(ctrl.image);
 			}
 			return { cmp: cmp_client, imgFromServer, imgToServer };
 		}
 
-		if (mv.image && (!sc.image || sc.image != mv.image)) {
-			imgToServer.push(mv.image);
+		if (nk.image && (!sc.image || sc.image != nk.image)) {
+			imgToServer.push(nk.image);
 		}
 		if (sc.image && !(await existsFS(this.nkState.rootDir!, sc.image))) {
 			imgFromServer.push(sc.image);
 		}
 
-		const cics = this.convertControlEntriesToICArray(mv.ctrls || []);
+		const cics = this.convertControlEntriesToICArray(nk.ctrls || []);
 		const sics = this.convertServerChangesControlEntries(sc.ctrlChanges);
-		let lc = lastChanged(mv);
+		let lc = lastChanged(nk);
 		if (lc < sc.lastChanged) {
 			cmp = await this.compareCtrlChanges(cics, sics, cmp_server, imgFromServer, imgToServer);
 		} else if (lc > sc.lastChanged) {

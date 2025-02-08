@@ -1,4 +1,4 @@
-import { type ControlEntry, type MarkerEntry, type Region } from '$lib/state.svelte';
+import { type ControlEntry, type NkEntry, type Region } from '$lib/state.svelte';
 import { type RequestHandler, error, json } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
 import * as nktables from '$lib/server/db/schema';
@@ -11,20 +11,20 @@ import type {
 	RegionsDbInsert,
 	User
 } from '$lib/server/db/schema';
-import { ctrl2Str, flattenObj, lastChanged, mv2DBStr, region2Str } from '$lib/utils';
+import { ctrl2Str, flattenObj, lastChanged, nk2DBStr, region2Str } from '$lib/utils';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { IMAGE_ROOTDIR } from '$env/static/private';
 // import { read } from '$app/server'; does not work
 
-function toNk(mv: MarkerEntry, username: string, region: string): NKDbInsert {
+function toNk(nk: NkEntry, username: string, region: string): NKDbInsert {
 	return {
-		id: +mv.id,
+		id: +nk.id,
 		username,
 		region,
-		data: mv2DBStr(mv, false),
-		createdAt: mv.createdAt ? new Date(mv.createdAt) : null,
-		changedAt: mv.changedAt ? new Date(mv.changedAt) : null,
+		data: nk2DBStr(nk, false),
+		createdAt: nk.createdAt ? new Date(nk.createdAt) : null,
+		changedAt: nk.changedAt ? new Date(nk.changedAt) : null,
 		deletedAt: null
 	};
 }
@@ -47,8 +47,8 @@ function toKontrollen(
 	};
 }
 
-function findMvCtrl(mv: MarkerEntry, id: string): ControlEntry | null {
-	const ctrls = mv.ctrls || [];
+function findNkCtrl(nk: NkEntry, id: string): ControlEntry | null {
+	const ctrls = nk.ctrls || [];
 	for (const ctrl of ctrls) {
 		if (ctrl.id == id) return ctrl;
 	}
@@ -62,14 +62,14 @@ function findDbCtrl(dbctrls: CtrlDbSelect[], id: number): CtrlDbSelect | null {
 	return null;
 }
 
-async function mvinsert(mv: MarkerEntry, username: string, region: string): Promise<number> {
-	const data = mv2str(mv);
+async function nkInsert(nk: NkEntry, username: string, region: string): Promise<number> {
+	const data = nk2str(nk);
 	const values: NKDbInsert = {
 		username,
 		region,
 		data,
-		createdAt: mv.createdAt ? new Date(mv.createdAt) : null,
-		changedAt: mv.changedAt ? new Date(mv.changedAt) : null,
+		createdAt: nk.createdAt ? new Date(nk.createdAt) : null,
+		changedAt: nk.changedAt ? new Date(nk.changedAt) : null,
 		deletedAt: null
 	};
 	const newid = await db.insert(nktables.nk).values(values).$returningId();
@@ -77,7 +77,7 @@ async function mvinsert(mv: MarkerEntry, username: string, region: string): Prom
 	return id;
 }
 
-async function ctrlinsert(
+async function ctrlInsert(
 	nkid: number,
 	ctrl: ControlEntry,
 	username: string,
@@ -99,8 +99,8 @@ async function ctrlinsert(
 	ctrlIds.push({ newid: id, oldid: ctrl.id });
 }
 
-function mv2str(mv: MarkerEntry): string {
-	const js = JSON.stringify(mv, (k, v) => {
+function nk2str(nk: NkEntry): string {
+	const js = JSON.stringify(nk, (k, v) => {
 		if (k == 'id') return undefined;
 		if (k == 'ctrls') return undefined;
 		if (k == 'selected') return undefined;
@@ -114,77 +114,77 @@ function mv2str(mv: MarkerEntry): string {
 	return js;
 }
 
-// the post handler gets a mv with ctrls and stores them into the DB if newer
-async function postMv(
+// the post handler gets a nk with ctrls and stores them into the DB if newer
+async function postNk(
 	request: Request,
 	username: string,
 	region: string | null
 ): Promise<Response> {
 	if (!region) return error(400, 'need region parameter');
 
-	const mv = (await request.json()) as MarkerEntry;
+	const nk = (await request.json()) as NkEntry;
 
-	const [mvDb] = await db.select().from(nktables.nk).where(eq(nktables.nk.id, +mv.id));
+	const [nkDb] = await db.select().from(nktables.nk).where(eq(nktables.nk.id, +nk.id));
 
-	// case 1: mv not yet in the db, insert unless deleted
-	if (!mvDb) {
-		if (mv.deletedAt) {
+	// case 1: nk not yet in the db, insert unless deleted
+	if (!nkDb) {
+		if (nk.deletedAt) {
 			// client can delete this entry
-			return json({ delete: { oldid: mv.id } }, { status: 200 });
+			return json({ delete: { oldid: nk.id } }, { status: 200 });
 		}
-		const id = await mvinsert(mv, username, region);
+		const id = await nkInsert(nk, username, region);
 		const ctrlIds: Object[] = [];
-		for (const ctrl of mv.ctrls || []) {
-			await ctrlinsert(id, ctrl, username, region, ctrlIds);
+		for (const ctrl of nk.ctrls || []) {
+			await ctrlInsert(id, ctrl, username, region, ctrlIds);
 		}
 		// client must update id's
-		return json({ updateids: { newid: id, oldid: mv.id, ctrls: ctrlIds } }, { status: 200 });
+		return json({ updateids: { newid: id, oldid: nk.id, ctrls: ctrlIds } }, { status: 200 });
 	}
 
 	// case 2: marker in the db, but deletedAt is set
 	// in the db mark as deleted
-	if (mvDb && mv.deletedAt) {
-		const deletedAt = new Date(mv.deletedAt);
+	if (nkDb && nk.deletedAt) {
+		const deletedAt = new Date(nk.deletedAt);
 		await db
 			.update(nktables.kontrollen)
 			.set({ deletedAt })
-			.where(eq(nktables.kontrollen.nkid, +mv.id));
-		await db.update(nktables.nk).set({ deletedAt }).where(eq(nktables.nk.id, +mv.id));
-		return json({ delete: { oldid: mv.id } }, { status: 200 });
+			.where(eq(nktables.kontrollen.nkid, +nk.id));
+		await db.update(nktables.nk).set({ deletedAt }).where(eq(nktables.nk.id, +nk.id));
+		return json({ delete: { oldid: nk.id } }, { status: 200 });
 	}
 
 	// case 3: marker in the db, must merge dependent on changedAt
-	const dbChanged = lastChanged(mvDb);
-	const mvChanged = lastChanged(mv);
-	if (dbChanged < mvChanged) {
+	const dbChanged = lastChanged(nkDb);
+	const nkChanged = lastChanged(nk);
+	if (dbChanged < nkChanged) {
 		await db
 			.update(nktables.nk)
-			.set(toNk(mv, username, region))
-			.where(eq(nktables.nk.id, +mv.id));
+			.set(toNk(nk, username, region))
+			.where(eq(nktables.nk.id, +nk.id));
 	}
 
 	let dbCtrls = (await db
 		.select()
 		.from(nktables.kontrollen)
-		.where(eq(nktables.kontrollen.nkid, +mv.id))) as CtrlDbSelect[];
+		.where(eq(nktables.kontrollen.nkid, +nk.id))) as CtrlDbSelect[];
 
 	for (const dbCtrl of dbCtrls) {
-		const mvCtrl = findMvCtrl(mv, dbCtrl.id.toString());
-		if (!mvCtrl) continue;
+		const nkCtrl = findNkCtrl(nk, dbCtrl.id.toString());
+		if (!nkCtrl) continue;
 		const dbChanged = lastChanged(dbCtrl);
-		const mvChanged = lastChanged(mvCtrl);
-		if (dbChanged < mvChanged) {
+		const nkChanged = lastChanged(nkCtrl);
+		if (dbChanged < nkChanged) {
 			await db
 				.update(nktables.kontrollen)
-				.set(toKontrollen(dbCtrl.id, mvCtrl, username, region))
+				.set(toKontrollen(dbCtrl.id, nkCtrl, username, region))
 				.where(eq(nktables.kontrollen.id, dbCtrl.id));
 		}
 	}
 	const ctrlIds: Object[] = [];
-	for (const mvCtrl of mv.ctrls || []) {
-		const dbCtrl = findDbCtrl(dbCtrls, +mvCtrl.id);
+	for (const nkCtrl of nk.ctrls || []) {
+		const dbCtrl = findDbCtrl(dbCtrls, +nkCtrl.id);
 		if (!dbCtrl) {
-			await ctrlinsert(mvDb.id, mvCtrl, username, region, ctrlIds);
+			await ctrlInsert(nkDb.id, nkCtrl, username, region, ctrlIds);
 		}
 	}
 	return json({ updatectrlids: { ctrls: ctrlIds } }, { status: 200 });
@@ -303,27 +303,27 @@ async function getChgs(region: string | null): Promise<Response> {
 		if (mchange) {
 			mchange.ctrlChanges.push({ id: cchange.id, lastChanged: lc, image: data.image });
 		} else {
-			console.log(`unknown marker id ${cchange.nkid} for kontrolle with id ${cchange.id}`);
+			console.log(`unknown nk id ${cchange.nkid} for kontrolle with id ${cchange.id}`);
 		}
 	}
 	if (scMap.size) return json(scMap.values().toArray());
 	return json([]);
 }
 
-async function getMvs(region: string | null): Promise<Response> {
+async function getNks(region: string | null): Promise<Response> {
 	if (!region) return error(400, 'need region parameter');
-	let mvalsDB = await db
+	let nkValsDB = await db
 		.select()
 		.from(nktables.nk)
 		.where(and(isNull(nktables.nk.deletedAt), eq(nktables.nk.region, region)));
-	let meVals: MarkerEntry[] = [];
-	for (const mvdb of mvalsDB) {
-		const data = JSON.parse(mvdb.data as string);
-		mvdb.data = data;
-		const mv = flattenObj(mvdb, {});
-		meVals.push(mv);
+	let nkVals: NkEntry[] = [];
+	for (const nkdb of nkValsDB) {
+		const data = JSON.parse(nkdb.data as string);
+		nkdb.data = data;
+		const nk = flattenObj(nkdb, {});
+		nkVals.push(nk);
 	}
-	return json(meVals);
+	return json(nkVals);
 }
 
 async function getCtrls(region: string | null): Promise<Response> {
@@ -363,9 +363,9 @@ async function nkDelete(id: number) {
 }
 
 async function removeDuplicates(): Promise<Response> {
-	let mvalArr: any = [];
+	let nkArr: any = [];
 	let count = 0;
-	let mvalsDB = await db
+	let nkValsDB = await db
 		.select({
 			id: nktables.nk.id,
 			data: nktables.nk.data,
@@ -374,22 +374,20 @@ async function removeDuplicates(): Promise<Response> {
 			deletedAt: nktables.nk.deletedAt
 		})
 		.from(nktables.nk);
-	for (const mvdb of mvalsDB) {
-		const data: any = JSON.parse(mvdb.data!);
-		let lc = lastChanged(mvdb);
-		mvalArr.push({ id: mvdb.id, lastChanged: lc, lat: data.latLng[0], lng: data.latLng[1] });
+	for (const nkdb of nkValsDB) {
+		const data: any = JSON.parse(nkdb.data!);
+		let lc = lastChanged(nkdb);
+		nkArr.push({ id: nkdb.id, lastChanged: lc, lat: data.latLng[0], lng: data.latLng[1] });
 	}
-	mvalArr = mvalArr.toSorted((a: any, b: any) => {
+	nkArr = nkArr.toSorted((a: any, b: any) => {
 		if (a.lat == b.lat) return a.lng - b.lng;
 		return a.lat - b.lat;
 	});
-	const len = mvalArr.length - 1;
+	const len = nkArr.length - 1;
 	for (let i = 0; i < len; i++) {
 		for (let j = i + 1; j < len; j++) {
-			if (mvalArr[i].lat == mvalArr[j].lat && mvalArr[i].lng == mvalArr[j].lng) {
-				await nkDelete(
-					mvalArr[i].lastChanged < mvalArr[j].lastChanged ? mvalArr[i].id : mvalArr[j].id
-				);
+			if (nkArr[i].lat == nkArr[j].lat && nkArr[i].lng == nkArr[j].lng) {
+				await nkDelete(nkArr[i].lastChanged < nkArr[j].lastChanged ? nkArr[i].id : nkArr[j].id);
 				count++;
 			} else {
 				i = j;
@@ -401,12 +399,12 @@ async function removeDuplicates(): Promise<Response> {
 	return json({ count });
 }
 
-// the get handler gets all change dates, or all mvs, or all ctrls, or one image
+// the get handler gets all change dates, or all nks, or all ctrls, or one image
 export const GET: RequestHandler = async ({ url }) => {
 	const what = url.searchParams.get('what');
 	const region = url.searchParams.get('region');
 	if (what == 'chg') return await getChgs(region);
-	if (what == 'nk') return await getMvs(region);
+	if (what == 'nk') return await getNks(region);
 	if (what == 'ctrls') return await getCtrls(region);
 	if (what == 'img') return await getImage(url.searchParams.get('imgPath'));
 	if (what == 'dpl') return await removeDuplicates();
@@ -416,7 +414,7 @@ export const GET: RequestHandler = async ({ url }) => {
 export const POST: RequestHandler = async ({ url, request, locals }) => {
 	const what = url.searchParams.get('what');
 	if (what == 'nk')
-		return await postMv(request, locals.user!.username, url.searchParams.get('region'));
+		return await postNk(request, locals.user!.username, url.searchParams.get('region'));
 	if (what == 'img') return await postImage(request, url.searchParams.get('imgPath'));
 	if (what == 'regions') return await postRegions(request, locals.user!);
 	return json([]);

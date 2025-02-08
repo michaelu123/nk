@@ -12,7 +12,7 @@
 	let { data } = $props();
 	let { rootDir } = data;
 	let username = nkState.user?.username;
-	let mvid = data.url.searchParams.get('mvid');
+	let nkid = data.url.searchParams.get('nkid');
 	let ctrlid = data.url.searchParams.get('ctrlid');
 	let nkName = data.url.searchParams.get('nkname');
 
@@ -23,9 +23,9 @@
 		if (blob) {
 			let { path, total } = await writeImg(msec, blob);
 			console.log('takePhoto', path, total);
-			await nkState.addPhoto(mvid!, ctrlid, path);
+			await nkState.addPhoto(nkid!, ctrlid, path);
 		}
-		goto('/nk/' + mvid);
+		goto('/nk/' + nkid);
 	};
 
 	async function writeImg(msec: string, blob: Blob): Promise<{ path: string; total: number }> {

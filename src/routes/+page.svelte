@@ -8,7 +8,7 @@
 		Progressbar
 	} from 'svelte-5-ui-lib';
 	import { page } from '$app/stores';
-	import { getState, State, type MarkerEntry } from '$lib/state.svelte';
+	import { getState, State, type NkEntry } from '$lib/state.svelte';
 	import { goto } from '$app/navigation';
 
 	import {
@@ -34,8 +34,7 @@
 	let { data } = $props();
 	let { rootDir, fetch } = data;
 
-	let { region, markerValues, maxBounds, defaultCenter, defaultZoom, isLoading } =
-		$derived(nkState);
+	let { region, nkValues, maxBounds, defaultCenter, defaultZoom, isLoading } = $derived(nkState);
 
 	// sidebar stuff
 	let activeUrl = $state($page.url.pathname);
@@ -108,10 +107,10 @@
 		document.documentElement.classList.toggle('dark');
 	}
 
-	function mclick(mv: MarkerEntry, index: number, e: any) {
+	function mclick(nk: NkEntry, index: number, e: any) {
 		// console.log(
 		// 	'mc1',
-		//  mv.name,
+		//  nk.name,
 		// 	'index',
 		// 	index,
 		// 	'selindex',
@@ -119,7 +118,7 @@
 		// 	'centering',
 		// 	centering,
 		// 	'selected',
-		// 	markerValues[index].selected,
+		// 	nkValues[index].selected,
 		// 	'event',
 		// 	e
 		// );
@@ -127,41 +126,41 @@
 		if (centering) {
 			map.off('move', onMapMove);
 			centering = false;
-			nkState.persistNK(mv, { latLng: mv.latLng });
+			nkState.persistNK(nk, { latLng: nk.latLng });
 		}
 		if (selectedMarkerIndex == -1) {
-			mv.selected = true;
+			nk.selected = true;
 			selectedMarkerIndex = index;
 		} else if (index == selectedMarkerIndex) {
-			mv.selected = false;
+			nk.selected = false;
 			selectedMarkerIndex = -1;
 		} else {
-			const othermv = markerValues[selectedMarkerIndex];
-			othermv.selected = false;
-			mv.selected = true;
+			const othernk = nkValues[selectedMarkerIndex];
+			othernk.selected = false;
+			nk.selected = true;
 			selectedMarkerIndex = index;
 		}
 		// console.log(
 		// 	'mc2',
-		//  mv.name,
+		//  nk.name,
 		// 	'index',
 		// 	selectedMarkerIndex,
 		// 	'centering',
 		// 	centering,
 		// 	'selected',
-		// 	markerValues[index].selected
+		// 	nkValues[index].selected
 		// );
 	}
 
 	function onMapClick(e: any) {
 		if (selectedMarkerIndex != -1) {
-			const mv = markerValues[selectedMarkerIndex];
-			mv.selected = false;
+			const nk = nkValues[selectedMarkerIndex];
+			nk.selected = false;
 			selectedMarkerIndex = -1;
 			if (centering) {
 				map.off('move', onMapMove);
 				centering = false;
-				nkState.persistNK(mv, { latLng: mv.latLng });
+				nkState.persistNK(nk, { latLng: nk.latLng });
 			}
 		}
 	}
@@ -169,7 +168,7 @@
 	function onMapMove(e: any) {
 		if (selectedMarkerIndex == -1) return;
 		const center = map.getCenter();
-		markerValues[selectedMarkerIndex].latLng = center;
+		nkValues[selectedMarkerIndex].latLng = center;
 	}
 
 	function logmap() {
@@ -186,10 +185,10 @@
 
 	function addControlToMarker() {
 		if (selectedMarkerIndex == -1) return;
-		const mv = markerValues[selectedMarkerIndex];
+		const nk = nkValues[selectedMarkerIndex];
 		selectedMarkerIndex = -1;
-		mv.selected = false;
-		gotoID(mv.id, 'kontrolle');
+		nk.selected = false;
+		gotoID(nk.id, 'kontrolle');
 	}
 
 	async function gotoID(id: string, path: string) {
@@ -208,29 +207,29 @@
 
 	function unselect() {
 		if (selectedMarkerIndex == -1) return;
-		const mv = markerValues[selectedMarkerIndex];
+		const nk = nkValues[selectedMarkerIndex];
 		selectedMarkerIndex = -1;
-		mv.selected = false;
+		nk.selected = false;
 	}
 
 	function editMarker() {
 		if (selectedMarkerIndex == -1) return;
 		const index = selectedMarkerIndex;
-		const mv = markerValues[selectedMarkerIndex];
+		const nk = nkValues[selectedMarkerIndex];
 		selectedMarkerIndex = -1;
-		mv.selected = false;
-		gotoID(mv.id, 'nk');
+		nk.selected = false;
+		gotoID(nk.id, 'nk');
 	}
 
 	async function deleteMarker() {
 		if (selectedMarkerIndex == -1) return;
-		const mv = markerValues[selectedMarkerIndex];
-		mv.selected = false;
+		const nk = nkValues[selectedMarkerIndex];
+		nk.selected = false;
 		const confirmDelete = window.confirm(
-			`Sie wollen die Daten des Nistkasten ${mv.name} wirklich löschen?`
+			`Sie wollen die Daten des Nistkasten ${nk.name} wirklich löschen?`
 		);
 		if (confirmDelete) {
-			await nkState.deleteMarker(selectedMarkerIndex);
+			await nkState.deleteNk(selectedMarkerIndex);
 			selectedMarkerIndex = -1;
 		}
 	}
@@ -417,19 +416,19 @@
 					</Marker>
 					<Circle latLng={currPos} options={{ radius, fillOpacity: 0.1 }} />
 				{/key}
-				{#each markerValues as mv, index (mv['latLng'])}
-					<Marker latLng={mv.latLng} {index} onclick={(e: any) => mclick(mv, index, e)}>
-						{#key mv.selected}
+				{#each nkValues as nk, index (nk['latLng'])}
+					<Marker latLng={nk.latLng} {index} onclick={(e: any) => mclick(nk, index, e)}>
+						{#key nk.selected}
 							<Icon
-								options={mv.selected
+								options={nk.selected
 									? selectedMarkerOptions
-									: mv.color == 'red'
+									: nk.color == 'red'
 										? redMarkerOptions
 										: greenMarkerOptions}
 							/>
 							<Popup class="flex w-28 flex-col items-center">
-								{mv.name}
-								{#if mv.selected}
+								{nk.name}
+								{#if nk.selected}
 									<Button class="btn m-1 w-24 bg-red-400" onclick={editMarker}>Anzeigen</Button>
 									<Button class="btn m-1 w-24 bg-red-400" onclick={addControlToMarker}
 										>Kontrolle</Button

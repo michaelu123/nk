@@ -9,7 +9,7 @@ const MAX_TIME_MS = MAX_DAYS * 24 * 60 * 60 * 1000;
 const mucLat = 48.137236594542834;
 const mucLng = 11.576174072626772;
 
-export interface MarkerEntry {
+export interface NkEntry {
 	latLng: number[];
 	ctrls: ControlEntry[] | null;
 	selected: boolean;
@@ -26,38 +26,38 @@ export interface MarkerEntry {
 	deletedAt: Date | string | null;
 }
 
-export function mvToObj(mv: MarkerEntry): any {
+export function nkToObj(nk: NkEntry): any {
 	let obj = {
-		latLng: [...mv.latLng], // "un"state
-		id: mv.id,
-		name: mv.name,
-		region: mv.region,
-		nkType: mv.nkType,
-		comment: mv.comment,
-		image: mv.image,
-		createdAt: mv.createdAt,
-		changedAt: mv.changedAt,
-		deletedAt: mv.deletedAt
+		latLng: [...nk.latLng], // "un"state
+		id: nk.id,
+		name: nk.name,
+		region: nk.region,
+		nkType: nk.nkType,
+		comment: nk.comment,
+		image: nk.image,
+		createdAt: nk.createdAt,
+		changedAt: nk.changedAt,
+		deletedAt: nk.deletedAt
 	};
 	return obj;
 }
 
-export function mv2str(mv: MarkerEntry) {
-	const obj = mvToObj(mv);
+export function nk2str(nk: NkEntry) {
+	const obj = nkToObj(nk);
 	const js = JSON.stringify(obj);
 	return js;
 }
 
-export function setColor(mv: MarkerEntry) {
+export function setColor(nk: NkEntry) {
 	let now = Date.now();
-	if (!mv.lastCleaned) {
-		mv.color = 'red';
+	if (!nk.lastCleaned) {
+		nk.color = 'red';
 	} else {
-		mv.color = now - (mv.lastCleaned as Date).valueOf() < MAX_TIME_MS ? 'green' : 'red';
+		nk.color = now - (nk.lastCleaned as Date).valueOf() < MAX_TIME_MS ? 'green' : 'red';
 	}
 }
 
-type UpdatableMarkerFields = {
+type UpdatableNkFields = {
 	latLng: number[];
 	name: string;
 	nkType: string;
@@ -148,7 +148,7 @@ export class State implements StateProps {
 
 	defaultCenter = $state(this.region ? this.region.center : State.regionDefault.center);
 	defaultZoom = $state(16);
-	markerValues = $state<MarkerEntry[]>([]);
+	nkValues = $state<NkEntry[]>([]);
 	maxBounds = $derived([
 		this.region ? this.region.lowerLeft : State.regionDefault.lowerLeft,
 		this.region ? this.region.upperRight : State.regionDefault.upperRight
@@ -215,14 +215,8 @@ export class State implements StateProps {
 		}
 	}
 
-	async fetchMarkersData(): Promise<MarkerEntry[]> {
-		const xxx = await this.idb!.getAllKeysFromIndex(
-			'nk',
-			'nkRegionIndex',
-			IDBKeyRange.only(this.selectedRegion)
-		);
-
-		const mvals: MarkerEntry[] = [];
+	async fetchNks(forSync: boolean): Promise<NkEntry[]> {
+		const nkVals: NkEntry[] = [];
 		let keys = this.idb
 			? (
 					await this.idb.getAllKeysFromIndex(
@@ -235,68 +229,19 @@ export class State implements StateProps {
 
 		for (let key of keys) {
 			const val = this.idb ? await this.idb.get('nk', key) : localStorage.getItem(key);
-			const mv = (this.idb ? val : JSON.parse(val)) as MarkerEntry;
-			mv.id = key;
-			mvals.push(mv);
-			this.updNkTypes(mv.nkType);
+			const nk = (this.idb ? val : JSON.parse(val)) as NkEntry;
+			if (!forSync && nk.deletedAt) continue;
+			nk.id = key;
+			nkVals.push(nk);
+			if (!forSync) this.updNkTypes(nk.nkType);
 		}
-		return mvals;
+		return nkVals;
 	}
 
-	async fetchMarkersProps(): Promise<MarkerEntry[]> {
-		const mvals: MarkerEntry[] = [];
-		let keys = this.idb
-			? (
-					await this.idb.getAllKeysFromIndex(
-						'nk',
-						'nkRegionIndex',
-						IDBKeyRange.only(this.selectedRegion)
-					)
-				).map((k) => k.toString())
-			: this.getLocalStorageKeys(true);
-
-		for (let key of keys) {
-			const val = this.idb ? await this.idb.get('nk', key) : localStorage.getItem(key);
-			const mv = (this.idb ? val : JSON.parse(val)) as MarkerEntry;
-			mv.id = key;
-			mvals.push(mv);
-		}
-		return mvals;
-	}
-
-	async fetchCtrlsProps(mvals: MarkerEntry[]) {
-		const markerMap: Map<string, MarkerEntry> = new Map();
-		for (let mv of mvals) {
-			markerMap.set(mv.id, mv);
-		}
-		let keys = this.idb
-			? (
-					await this.idb.getAllKeysFromIndex(
-						'kontrollen',
-						'nkRegionIndex',
-						IDBKeyRange.only(this.selectedRegion)
-					)
-				).map((k) => k.toString())
-			: this.getLocalStorageKeys(false);
-		for (let key of keys) {
-			const val = this.idb ? await this.idb.get('kontrollen', key) : localStorage.getItem(key);
-			const ctrl = (this.idb ? val : JSON.parse(val)) as ControlEntry;
-			ctrl.id = key;
-			ctrl.date = new Date(ctrl.date);
-			let mv = markerMap.get(ctrl.nkid);
-			if (mv) {
-				if (!mv.ctrls) mv.ctrls = [];
-				mv.ctrls.push(ctrl);
-			} else {
-				console.log('no marker for control ' + JSON.stringify(ctrl));
-			}
-		}
-	}
-
-	async fetchCtrlsData(mvals: MarkerEntry[], forSync: boolean) {
-		const markerMap: Map<string, MarkerEntry> = new Map();
-		for (let mv of mvals) {
-			markerMap.set(mv.id, mv);
+	async fetchCtrls(nkVals: NkEntry[], forSync: boolean) {
+		const nkMap: Map<string, NkEntry> = new Map();
+		for (let nk of nkVals) {
+			nkMap.set(nk.id, nk);
 		}
 		let keys = this.idb
 			? (
@@ -313,22 +258,24 @@ export class State implements StateProps {
 			ctrl.id = key;
 			if (!forSync && ctrl.deletedAt) continue;
 			ctrl.date = new Date(ctrl.date);
-			let mv = markerMap.get(ctrl.nkid);
-			if (mv) {
-				if (!mv.ctrls) mv.ctrls = [];
-				mv.ctrls.push(ctrl);
-				if (ctrl.cleaned && (!mv.lastCleaned || ctrl.date > mv.lastCleaned)) {
-					mv.lastCleaned = ctrl.date;
+			let nk = nkMap.get(ctrl.nkid);
+			if (nk) {
+				if (!nk.ctrls) nk.ctrls = [];
+				nk.ctrls.push(ctrl);
+				if (ctrl.cleaned && (!nk.lastCleaned || ctrl.date > nk.lastCleaned)) {
+					nk.lastCleaned = ctrl.date;
 				}
-				if (ctrl.species) this.updNkSpecies(ctrl.species);
+				if (ctrl.species && !forSync) this.updNkSpecies(ctrl.species);
 			} else {
-				console.log('no marker for control ' + JSON.stringify(ctrl));
+				console.log('no nk for control ' + JSON.stringify(ctrl));
 			}
 		}
-		for (let mv of mvals) {
-			setColor(mv);
-			if (mv.ctrls && mv.ctrls.length > 1) {
-				mv.ctrls = mv.ctrls.toSorted((b, a) => a.date.valueOf() - b.date.valueOf());
+		if (!forSync) {
+			for (let nk of nkVals) {
+				setColor(nk);
+				if (nk.ctrls && nk.ctrls.length > 1) {
+					nk.ctrls = nk.ctrls.toSorted((b, a) => a.date.valueOf() - b.date.valueOf());
+				}
 			}
 		}
 	}
@@ -363,10 +310,10 @@ export class State implements StateProps {
 			await this.fetchRegionData();
 			await this.fetchOccData('nktypes');
 			await this.fetchOccData('nkspecies');
-			const mvals = await this.fetchMarkersData();
-			await this.fetchCtrlsData(mvals, false);
+			const nkVals = await this.fetchNks(false);
+			await this.fetchCtrls(nkVals, false);
 			await this.fetchCenterData();
-			this.markerValues = mvals;
+			this.nkValues = nkVals;
 		} finally {
 			this.isLoading = false;
 		}
@@ -374,9 +321,9 @@ export class State implements StateProps {
 		// console.log('nkspecs', $state.snapshot(this.nkSpecies));
 	}
 
-	async importMV(mv: MarkerEntry) {
-		this.markerValues.push(mv);
-		await this.storeMv(mv);
+	async importNk(nk: NkEntry) {
+		this.nkValues.push(nk);
+		await this.storeNk(nk);
 	}
 
 	async storeCtrl(ctrl: ControlEntry) {
@@ -393,11 +340,11 @@ export class State implements StateProps {
 		}
 	}
 
-	async deleteMarker(index: number) {
+	async deleteNk(index: number) {
 		if (index == -1) return;
-		const mv = this.markerValues[index];
-		const id = mv.id;
-		this.markerValues.splice(index, 1);
+		const nk = this.nkValues[index];
+		const id = nk.id;
+		this.nkValues.splice(index, 1);
 		// if (this.idb) {
 		// 	await this.idb!.delete('nk', id);
 		// } else {
@@ -405,11 +352,11 @@ export class State implements StateProps {
 		// }
 		const today = new Date();
 		today.setMilliseconds(0);
-		mv.deletedAt = today;
-		this.persistNK(mv, {});
-		const image = mv.image;
+		nk.deletedAt = today;
+		this.persistNK(nk, {});
+		const image = nk.image;
 		if (this.rootDir && image) await removePath(this.rootDir, image);
-		for (const ctrl of mv.ctrls ?? []) {
+		for (const ctrl of nk.ctrls ?? []) {
 			// if (this.idb) {
 			// 	await this.idb.delete('kontrollen', ctrl.id);
 			// } else {
@@ -417,7 +364,7 @@ export class State implements StateProps {
 			// }
 			ctrl.deletedAt = today;
 			const image = ctrl.image;
-			this.persistCtrl(mv, ctrl, {});
+			this.persistCtrl(nk, ctrl, {});
 			if (this.rootDir && image) await removePath(this.rootDir, image);
 		}
 	}
@@ -429,36 +376,36 @@ export class State implements StateProps {
 		this.storeSettings('center', [...center]); // "unstate" if center is a $state variable
 	}
 
-	async storeMv(mv: MarkerEntry) {
+	async storeNk(nk: NkEntry) {
 		if (this.idb) {
 			try {
-				const obj = mvToObj(mv);
-				await this.idb.put('nk', obj, mv.id);
+				const obj = nkToObj(nk);
+				await this.idb.put('nk', obj, nk.id);
 			} catch (e: any) {
 				console.log('err idb.put', e);
 			}
 		} else {
-			const js = mv2str(mv);
-			localStorage.setItem(this.selectedRegion + '_' + mv.id, js);
+			const js = nk2str(nk);
+			localStorage.setItem(this.selectedRegion + '_' + nk.id, js);
 		}
 	}
 
-	async persistNK(mv: MarkerEntry, updateObject: Partial<UpdatableMarkerFields>) {
+	async persistNK(nk: NkEntry, updateObject: Partial<UpdatableNkFields>) {
 		for (const key of Object.keys(updateObject)) {
-			if (key == 'latLng') mv.latLng = updateObject.latLng!;
-			if (key == 'name') mv.name = updateObject.name!;
-			if (key == 'nkType') mv.nkType = updateObject.nkType!;
-			if (key == 'image') mv.image = updateObject.image!;
-			if (key == 'comment') mv.comment = updateObject.comment!;
+			if (key == 'latLng') nk.latLng = updateObject.latLng!;
+			if (key == 'name') nk.name = updateObject.name!;
+			if (key == 'nkType') nk.nkType = updateObject.nkType!;
+			if (key == 'image') nk.image = updateObject.image!;
+			if (key == 'comment') nk.comment = updateObject.comment!;
 		}
-		mv.changedAt = new Date();
-		mv.changedAt.setMilliseconds(0);
+		nk.changedAt = new Date();
+		nk.changedAt.setMilliseconds(0);
 
-		await this.storeMv(mv);
+		await this.storeNk(nk);
 	}
 
 	async persistCtrl(
-		mv: MarkerEntry,
+		nk: NkEntry,
 		ctrl: ControlEntry,
 		updateObject: Partial<UpdatableControlFields>
 	) {
@@ -473,13 +420,13 @@ export class State implements StateProps {
 
 		await this.storeCtrl(ctrl);
 
-		mv.lastCleaned = null;
-		for (let c of mv.ctrls!) {
-			if (c.cleaned && (!mv.lastCleaned || c.date > mv.lastCleaned)) {
-				mv.lastCleaned = c.date;
+		nk.lastCleaned = null;
+		for (let c of nk.ctrls!) {
+			if (c.cleaned && (!nk.lastCleaned || c.date > nk.lastCleaned)) {
+				nk.lastCleaned = c.date;
 			}
 		}
-		setColor(mv);
+		setColor(nk);
 	}
 
 	updNkTypes(nkType: string) {
@@ -502,21 +449,21 @@ export class State implements StateProps {
 		}
 	}
 
-	async addPhoto(mvid: string, ctrlid: string | null, path: string) {
-		const mv = this.markerValues.find((m) => m.id == mvid);
-		if (mv) {
+	async addPhoto(nkid: string, ctrlid: string | null, path: string) {
+		const nk = this.nkValues.find((m) => m.id == nkid);
+		if (nk) {
 			if (ctrlid) {
-				const ctrl = mv.ctrls?.find((c) => c.id == ctrlid);
+				const ctrl = nk.ctrls?.find((c) => c.id == ctrlid);
 				if (ctrl) {
-					this.persistCtrl(mv, ctrl, { image: path });
+					this.persistCtrl(nk, ctrl, { image: path });
 				} else {
-					console.log(`cannot find ctrlid ${ctrlid} for marker ${mvid} and image in ${path}`);
+					console.log(`cannot find ctrlid ${ctrlid} for marker ${nkid} and image in ${path}`);
 				}
 				return;
 			}
-			await this.persistNK(mv, { image: path });
+			await this.persistNK(nk, { image: path });
 		} else {
-			console.log(`cannot find nkid ${mvid} for image in ${path}`);
+			console.log(`cannot find nkid ${nkid} for image in ${path}`);
 		}
 	}
 

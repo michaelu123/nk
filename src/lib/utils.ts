@@ -1,4 +1,4 @@
-import type { ControlEntry, MarkerEntry, Region } from './state.svelte';
+import type { ControlEntry, NkEntry, Region } from './state.svelte';
 
 export function date2Str(val: any) {
 	if ('getYear' in val) val = val.toJSON();
@@ -23,7 +23,7 @@ export function flattenObj(obj: any, res: any) {
 	return res;
 }
 
-export function mv2DBStr(obj: MarkerEntry, withCtrls: boolean) {
+export function nk2DBStr(obj: NkEntry, withCtrls: boolean) {
 	const js = JSON.stringify(obj, (k, v) => {
 		if (k == 'selected') return undefined;
 		if (k == 'color') return undefined;

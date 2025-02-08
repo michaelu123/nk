@@ -11,9 +11,9 @@ export const GET: RequestHandler = async ({ params }) => {
 	if (!res || res.length != 1) {
 		return error(404, 'no nk entry for id ' + nkid);
 	}
-	const mvdb = res[0]!;
-	const data = JSON.parse(mvdb.data as string);
-	mvdb.data = data;
+	const nkdb = res[0]!;
+	const data = JSON.parse(nkdb.data as string);
+	nkdb.data = data;
 
 	const ctrls = await db.select().from(table.kontrollen).where(eq(table.kontrollen.nkid, nkid));
 	for (const ctrl of ctrls) {
@@ -25,8 +25,8 @@ export const GET: RequestHandler = async ({ params }) => {
 		ctrls[i] = flattenObj(ctrls[i], {});
 	}
 
-	(mvdb as any).ctrls = ctrls;
+	(nkdb as any).ctrls = ctrls;
 
-	const mv = flattenObj(mvdb, {});
-	return json(mv);
+	const nk = flattenObj(nkdb, {});
+	return json(nk);
 };

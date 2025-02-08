@@ -2,11 +2,11 @@ import { redirect } from '@sveltejs/kit';
 import type { PageLoad } from './$types';
 
 export const load: PageLoad = async ({ url }) => {
-	let mvid = url.searchParams.get('mvid');
+	let nkid = url.searchParams.get('nkid');
 	let ctrlid = url.searchParams.get('ctrlid');
 	let nkName = url.searchParams.get('nkname');
 
-	if (!mvid || !nkName) {
+	if (!nkid || !nkName) {
 		return redirect(302, '/');
 	}
 

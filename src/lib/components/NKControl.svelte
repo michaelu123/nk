@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { ControlEntry, MarkerEntry } from '$lib/state.svelte';
+	import type { ControlEntry, NkEntry } from '$lib/state.svelte';
 	import { Button, Label, Textarea, Card, Checkbox, Spinner, P } from 'svelte-5-ui-lib';
 	import { getState } from '$lib/state.svelte';
 	import ProposedInput from './ProposedInput.svelte';
@@ -8,11 +8,11 @@
 
 	interface Props {
 		ctrl: ControlEntry;
-		mv: MarkerEntry;
+		nk: NkEntry;
 		nkSpecies: Map<string, number>;
 		cb: Function | null;
 	}
-	let { ctrl, mv, nkSpecies, cb }: Props = $props();
+	let { ctrl, nk, nkSpecies, cb }: Props = $props();
 	let nkState = getState();
 
 	let isEditMode = $state(!!cb);
@@ -37,15 +37,15 @@
 			if (!nkSpec) return;
 			if (cb) {
 				// called from /kontrolle/id, to add a new ctrl.
-				if (mv.ctrls) {
-					mv.ctrls = [ctrl, ...mv.ctrls];
+				if (nk.ctrls) {
+					nk.ctrls = [ctrl, ...nk.ctrls];
 				} else {
-					mv.ctrls = [ctrl];
+					nk.ctrls = [ctrl];
 				}
 			}
-			await nkState.persistCtrl(mv, ctrl, { species: nkSpec, comment, cleaned });
+			await nkState.persistCtrl(nk, ctrl, { species: nkSpec, comment, cleaned });
 			if (takePhoto) {
-				goto(`/photo?mvid=${mv.id}&ctrlid=${ctrl.id}&nkname=${mv.name}`);
+				goto(`/photo?nkid=${nk.id}&ctrlid=${ctrl.id}&nkname=${nk.name}`);
 			} else if (cb) {
 				cb();
 			}

@@ -4,7 +4,7 @@ import type { MarkerEntryProps } from './state.svelte';
 const mucLat = 48.137236594542834,
 	mucLng = 11.576174072626772;
 
-export let markerVals: MarkerEntryProps[] = [
+export let nkVals: NkEntry[] = [
 	{
 		latLng: [mucLat + 0.001, mucLng + 0.001],
 		ctrls: null,
@@ -17,7 +17,9 @@ export let markerVals: MarkerEntryProps[] = [
 		lastCleaned: new Date(2022, 1, 1, 12),
 		createdAt: new Date(2022, 1, 1, 12),
 		changedAt: null,
-		color: 'green'
+		color: 'green',
+		region: 'alle',
+		deletedAt: null
 	},
 	{
 		latLng: [mucLat - 0.001, mucLng + 0.001],
@@ -31,7 +33,9 @@ export let markerVals: MarkerEntryProps[] = [
 		lastCleaned: new Date(2022, 1, 2, 12),
 		createdAt: new Date(2022, 1, 2, 12),
 		changedAt: null,
-		color: 'red'
+		color: 'red',
+		region: 'alle',
+		deletedAt: null
 	},
 	{
 		latLng: [mucLat + 0.001, mucLng - 0.001],
@@ -45,7 +49,9 @@ export let markerVals: MarkerEntryProps[] = [
 		lastCleaned: new Date(2022, 1, 3, 12),
 		createdAt: new Date(2022, 1, 3, 12),
 		changedAt: null,
-		color: 'green'
+		color: 'green',
+		region: 'alle',
+		deletedAt: null
 	},
 	{
 		latLng: [mucLat - 0.001, mucLng - 0.001],
@@ -59,11 +65,12 @@ export let markerVals: MarkerEntryProps[] = [
 		lastCleaned: new Date(2022, 1, 4, 12),
 		createdAt: new Date(2022, 1, 4, 12),
 		changedAt: null,
-		color: 'red'
+		color: 'red',
+		region: 'alle',
+		deletedAt: null
 	}
 ];
 */
-
 export let nkDefaultTypes = [
 	'Nistkasten',
 	'Flachkasten',
