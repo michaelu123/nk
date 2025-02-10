@@ -399,6 +399,64 @@ async function removeDuplicates(): Promise<Response> {
 	return json({ count });
 }
 
+async function setRegion(nkDb: any, sn: string) {
+	await db.update(nktables.nk).set({ region: sn }).where(eq(nktables.nk.id, nkDb.id));
+	for (const ctrl of nkDb.ctrls) {
+		await db
+			.update(nktables.kontrollen)
+			.set({ region: sn })
+			.where(eq(nktables.kontrollen.id, ctrl.id));
+	}
+}
+
+// https://localhost:5173/api/db?what=sep
+async function sepAlle() {
+	let nkMap = new Map<number, any>();
+	let nkDBs: any[] = await db
+		.select({
+			id: nktables.nk.id,
+			data: nktables.nk.data
+		})
+		.from(nktables.nk)
+		.where(eq(nktables.nk.region, 'alle'));
+
+	for (const nkDb of nkDBs) {
+		nkDb.data = JSON.parse(nkDb.data!);
+		nkDb.ctrls = [];
+		nkMap.set(nkDb.id, nkDb);
+	}
+	let ctrlDBs = await db
+		.select({
+			id: nktables.kontrollen.id,
+			data: nktables.kontrollen.data,
+			nkid: nktables.kontrollen.nkid
+		})
+		.from(nktables.kontrollen)
+		.where(eq(nktables.kontrollen.region, 'alle'));
+
+	for (const ctrlDb of ctrlDBs) {
+		ctrlDb.data = JSON.parse(ctrlDb.data!);
+		const nkDb2 = nkMap.get(ctrlDb.nkid);
+		if (!nkDb2) {
+			console.log(`unknown nk id ${ctrlDb.nkid} for kontrolle with id ${ctrlDb.id}`);
+			continue;
+		}
+		nkDb2.ctrls.push(ctrlDb);
+	}
+	for (const nkDb of nkDBs) {
+		const lat = nkDb.data.latLng[0];
+		const lng = nkDb.data.latLng[1];
+		if (lat > 48.11081227 && lng < 11.54413753) {
+			await setRegion(nkDb, 'nhbn');
+		} else if (lat < 48.11081227 && lat > 48.102677 && lng < 11.54413753) {
+			await setRegion(nkDb, 'nhbs');
+		} else {
+			await setRegion(nkDb, 'flaufl');
+		}
+	}
+	return json({ xx: 'yy' });
+}
+
 // the get handler gets all change dates, or all nks, or all ctrls, or one image
 export const GET: RequestHandler = async ({ url }) => {
 	const what = url.searchParams.get('what');
@@ -408,6 +466,7 @@ export const GET: RequestHandler = async ({ url }) => {
 	if (what == 'ctrls') return await getCtrls(region);
 	if (what == 'img') return await getImage(url.searchParams.get('imgPath'));
 	if (what == 'dpl') return await removeDuplicates();
+	if (what == 'sep') return await sepAlle();
 	return json([]);
 };
 

@@ -5,28 +5,33 @@
 	import { onMount } from 'svelte';
 	import { Button, Input, Label, Range, Select } from 'svelte-5-ui-lib';
 
-	const xFactor = 3000;
-	const yFactor = 4000;
+	const xFactor = 3000.0;
+	const yFactor = 4000.0;
 
 	let nkState = getState();
 	let { regions, region } = $derived(nkState);
+	$inspect('region', region);
 
 	let map: any = $state(null);
 	let center = $state(nkState.region?.center || State.regionDefault.center);
-	$inspect('center', center);
 	let zoom = $state(16);
 	let xoff = $state(6);
 	let yoff = $state(6);
 	let isEditMode = $state(false);
 	let isNewRegion = $state(false);
-	let maxBounds = $derived.by(() =>
-		region && !isEditMode
-			? [region.lowerLeft, region.upperRight]
-			: [
-					[center[0] + yoff / yFactor, center[1] - xoff / xFactor],
-					[center[0] - yoff / yFactor, center[1] + xoff / xFactor]
-				]
-	);
+	let maxBounds = $derived.by(() => {
+		if (region && !isEditMode) {
+			return [region.lowerLeft, region.upperRight];
+		}
+		const lat = center[0];
+		const lng = center[1];
+		const x = xoff / xFactor;
+		const y = yoff / yFactor;
+		return [
+			[lat + y, lng - x],
+			[lat - y, lng + x]
+		];
+	});
 	// svelte-ignore state_referenced_locally
 	let regionName = $state(region?.name || '');
 	// svelte-ignore state_referenced_locally
@@ -36,8 +41,7 @@
 
 	function onMapMove(e: any) {
 		const mc = map.getCenter();
-		center[0] = mc.lat;
-		center[1] = mc.lng;
+		center = [mc.lat, mc.lng];
 	}
 
 	$effect(() => {
@@ -48,7 +52,6 @@
 	});
 
 	onMount(() => {
-		console.log('onmount', regions, region);
 		isEditMode = !regions || regions.length == 0;
 		isNewRegion = isEditMode;
 	});
@@ -112,20 +115,16 @@
 		isEditMode = !isEditMode;
 	}
 
-	function selectRegion(e: any) {
-		const sname = e.target.value;
-		const rg = regions.find((r) => r.shortName == sname);
-		nkState.selectRegion(sname);
-		center = rg!.center;
-		nkState.updDefaultCenter(rg!.center, map.getZoom());
-		const options = { animate: false };
-		map.flyTo(center, map.getZoom(), options);
+	async function selectRegion() {
+		center = await nkState.selectRegion(shortName);
+		zoom = 18;
+		await map.flyTo(center, zoom);
 	}
 
-	function deleteRegion(e: any) {
-		const sname = e.target.value;
-		console.log('delete', shortName);
-		// nkState.deleteRegion(sname);
+	async function deleteRegion() {
+		await nkState.deleteRegion(shortName);
+		nkState.region = null;
+		shortName = '';
 	}
 
 	function goBack() {
@@ -254,45 +253,43 @@
 		{@render display()}
 	{/if}
 	<div class="w-full flex-auto">
-		{#key center}
-			<SVMap
-				bind:instance={map}
+		<SVMap
+			bind:instance={map}
+			options={{
+				center,
+				zoom,
+				maxZoom: 20,
+				minZoom: 10,
+				zoomControl: false,
+				attributionControl: true,
+				maxBounds
+			}}
+		>
+			<p id="crosshair">{'\u2316'}</p>
+			<Polygon
+				latLngs={[
+					[maxBounds[0][0], maxBounds[0][1]],
+					[maxBounds[0][0], maxBounds[1][1]],
+					[maxBounds[1][0], maxBounds[1][1]],
+					[maxBounds[1][0], maxBounds[0][1]]
+				]}
+				options={{ fill: false }}
+			/>
+			<TileLayer
+				url={'https://tile.openstreetmap.org/{z}/{x}/{y}.png'}
+				attribution={'&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'}
 				options={{
-					center,
-					zoom,
-					maxZoom: 20,
-					minZoom: 10,
-					zoomControl: false,
-					attributionControl: true,
-					maxBounds
+					maxNativeZoom: 19,
+					maxZoom: 20
 				}}
-			>
-				<p id="crosshair">{'\u2316'}</p>
-				<Polygon
-					latLngs={[
-						[maxBounds[0][0], maxBounds[0][1]],
-						[maxBounds[0][0], maxBounds[1][1]],
-						[maxBounds[1][0], maxBounds[1][1]],
-						[maxBounds[1][0], maxBounds[0][1]]
-					]}
-					options={{ fill: false }}
-				/>
-				<TileLayer
-					url={'https://tile.openstreetmap.org/{z}/{x}/{y}.png'}
-					attribution={'&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'}
-					options={{
-						maxNativeZoom: 19,
-						maxZoom: 20
-					}}
-				></TileLayer>
-				<ControlZoom options={{ position: 'topright' }} />
-				<ControlAttribution
-					options={{
-						prefix:
-							'&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-					}}
-				/>
-			</SVMap>
-		{/key}
+			></TileLayer>
+			<ControlZoom options={{ position: 'topright' }} />
+			<ControlAttribution
+				options={{
+					prefix:
+						'&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+				}}
+			/>
+		</SVMap>
 	</div>
 </div>

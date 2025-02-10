@@ -1,6 +1,8 @@
 import type { ControlEntry, NkEntry, Region } from './state.svelte';
 
 export function date2Str(val: any) {
+	if (val == null) return null;
+	if (typeof val == 'string') return val;
 	if ('getYear' in val) val = val.toJSON();
 	return val;
 }

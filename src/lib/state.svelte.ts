@@ -3,6 +3,7 @@ import { nkDefaultTypes, nkDefaultSpecies } from './fakeDB';
 import type { IDBPDatabase } from 'idb';
 import { removePath } from './fs';
 import { ctrl2Str, date2Str } from './utils';
+import { goto } from '$app/navigation';
 
 const MAX_DAYS = 100; // TODO configurable?
 const MAX_TIME_MS = MAX_DAYS * 24 * 60 * 60 * 1000;
@@ -370,7 +371,6 @@ export class State implements StateProps {
 	}
 
 	async updDefaultCenter(center: number[], zoom: number) {
-		// this.defaultCenter = center; //  does not trigger state change!?
 		this.defaultCenter = center;
 		this.defaultZoom = zoom;
 		this.storeSettings('center', [...center]); // "unstate" if center is a $state variable
@@ -478,17 +478,31 @@ export class State implements StateProps {
 				break;
 			}
 		}
-		if (!found) this.regions.push(newRegion);
-		this.storeSettings('regions', this.regions);
-		this.storeSettings('selectedRegion', newRegion.shortName);
+		if (!found) {
+			this.regions.push(newRegion);
+		}
+		await this.storeSettings('regions', $state.snapshot(this.regions));
+		await this.selectRegion(newRegion.shortName);
 	}
 
-	selectRegion(sname: string) {
-		this.region = this.regions.find((r) => r.shortName == sname) || State.regionDefault;
-		if (this.selectedRegion != sname) {
-			this.selectedRegion = sname;
-			this.storeSettings('selectedRegion', sname);
-			this.fetchData();
+	async selectRegion(sname: string): Promise<number[]> {
+		const rg = this.regions.find((r) => r.shortName == sname) || State.regionDefault;
+		const center = rg.center;
+		await this.updDefaultCenter(center, 16);
+		this.selectedRegion = rg.shortName;
+		await this.storeSettings('selectedRegion', rg.shortName);
+		await this.fetchData();
+		return center;
+	}
+
+	async deleteRegion(sname: string) {
+		const x = this.regions.findIndex((r) => r.shortName == sname);
+		if (x != -1) {
+			this.regions.splice(x);
+			await this.storeSettings('regions', $state.snapshot(this.regions));
+			this.selectedRegion = null;
+			await this.storeSettings('selectedRegion', null);
+			await goto('/region');
 		}
 	}
 

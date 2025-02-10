@@ -5,6 +5,9 @@ import { eq, and, inArray, isNull } from 'drizzle-orm';
 import type { LayoutServerLoad } from './$types';
 export const ssr = false;
 export const load: LayoutServerLoad = async (event) => {
+	if (event.url.pathname == '/login') {
+		return { user: null, regionsDB: null };
+	}
 	const user = event.locals.user;
 	const regionIdQuery = db
 		.select({ regionid: nktables.userregions.region })
