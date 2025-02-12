@@ -3,7 +3,7 @@
 	import { getState, State, type Region } from '$lib/state.svelte';
 	import { Map as SVMap, TileLayer, ControlZoom, ControlAttribution, Polygon } from 'sveaflet';
 	import { onMount } from 'svelte';
-	import { Button, Input, Label, Range, Select } from 'svelte-5-ui-lib';
+	import { Button, Input, Label, Progressbar, Range, Select } from 'svelte-5-ui-lib';
 
 	const xFactor = 3000.0;
 	const yFactor = 4000.0;
@@ -28,8 +28,8 @@
 		const x = xoff / xFactor;
 		const y = yoff / yFactor;
 		return [
-			[lat + y, lng - x],
-			[lat - y, lng + x]
+			[lat - y, lng - x],
+			[lat + y, lng + x]
 		];
 	});
 	// svelte-ignore state_referenced_locally
@@ -38,6 +38,7 @@
 	let shortName = $state(region?.shortName || '');
 	let errorMessage1 = $state('');
 	let errorMessage2 = $state('');
+	let progress = $state(0);
 
 	function onMapMove(e: any) {
 		const mc = map.getCenter();
@@ -109,7 +110,7 @@
 			} else {
 				center = region!.center;
 				xoff = (center[1] - region!.lowerLeft[1]) * xFactor;
-				yoff = (region!.lowerLeft[0] - center[0]) * yFactor;
+				yoff = (center[0] - region!.lowerLeft[0]) * yFactor;
 			}
 		}
 		isEditMode = !isEditMode;
@@ -117,6 +118,7 @@
 
 	async function selectRegion() {
 		center = await nkState.selectRegion(shortName);
+		regionName = nkState.region!.name;
 		zoom = 18;
 		await map.flyTo(center, zoom);
 	}
@@ -133,6 +135,13 @@
 		center = region!.center;
 		isEditMode = false;
 		map.off('move', onMapMove);
+	}
+
+	function prefetchRegion() {
+		navigator.serviceWorker.addEventListener('message', (m) => {
+			progress = Math.round(m.data * 100);
+		});
+		navigator.serviceWorker.controller?.postMessage({ region: $state.snapshot(nkState.region) });
 	}
 </script>
 
@@ -241,9 +250,15 @@
 				>{isEditMode ? 'Speichern' : 'Ändern'}</Button
 			>
 			<Button class="m-4 w-min" onclick={deleteRegion}>Löschen</Button>
+			<Button class="m-4 w-min whitespace-nowrap" onclick={prefetchRegion}>Map laden</Button>
 		{/if}
 		<Button class="m-4 w-min" onclick={() => toggleEditMode(true)}>Neu</Button>
 	</div>
+	{#if progress != 0}
+		<div class="absolute left-1/4 top-1/3 z-[490] w-2/4">
+			<Progressbar {progress} labelOutside="Kartenladen-Fortschritt" size="h-6" />
+		</div>
+	{/if}
 {/snippet}
 
 <div class="flex h-screen flex-col p-6">
@@ -279,7 +294,7 @@
 				url={'https://tile.openstreetmap.org/{z}/{x}/{y}.png'}
 				attribution={'&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'}
 				options={{
-					maxNativeZoom: 19,
+					maxNativeZoom: 18,
 					maxZoom: 20
 				}}
 			></TileLayer>

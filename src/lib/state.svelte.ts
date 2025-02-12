@@ -170,7 +170,6 @@ export class State implements StateProps {
 		this.region = data.region;
 		this.regions = data.regions || [];
 		this.selectedRegion = data.selectedRegion;
-		console.log('updatestate region', this.region);
 		this.fetchData();
 	}
 
@@ -490,6 +489,7 @@ export class State implements StateProps {
 		const center = rg.center;
 		await this.updDefaultCenter(center, 16);
 		this.selectedRegion = rg.shortName;
+		this.region = rg;
 		await this.storeSettings('selectedRegion', rg.shortName);
 		await this.fetchData();
 		return center;

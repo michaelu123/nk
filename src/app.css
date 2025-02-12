@@ -5,3 +5,19 @@
 html {
 	font-size: calc(0.5em + 1vw);
 }
+
+#crosshair {
+	/* some experimenting done... */
+	left: calc(50% - 39px);
+	top: calc(50% - 40px);
+	position: absolute;
+	width: 80px;
+	height: 80px;
+	z-index: 500;
+	text-align: center;
+	font-weight: normal;
+	font-size: 50px;
+	color: #222;
+	text-shadow: 1px 1px 3px #fff;
+	pointer-events: none;
+}

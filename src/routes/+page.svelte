@@ -347,8 +347,6 @@
 		await rmR();
 		const sy = new Sync(nkState, fetch!, () => {});
 		await sy.clearDb();
-		await sy.removeDuplicates();
-		console.log('Ende clearData');
 		isSidebarOpen = false;
 	}
 </script>
@@ -397,7 +395,7 @@
 					url={'https://tile.openstreetmap.org/{z}/{x}/{y}.png'}
 					attribution={'&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'}
 					options={{
-						maxNativeZoom: 19,
+						maxNativeZoom: 18,
 						maxZoom: 20
 					}}
 				></TileLayer>
@@ -501,21 +499,3 @@
 {:else}
 	{@render svmap()}
 {/if}
-
-<style>
-	#crosshair {
-		/* some experimenting done... */
-		left: calc(50% - 39px);
-		top: calc(50% - 40px);
-		position: absolute;
-		width: 80px;
-		height: 80px;
-		z-index: 500;
-		text-align: center;
-		font-weight: normal;
-		font-size: 50px;
-		color: #222;
-		text-shadow: 1px 1px 3px #fff;
-		pointer-events: none;
-	}
-</style>
