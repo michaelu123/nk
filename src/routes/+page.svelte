@@ -29,6 +29,7 @@
 	import greenMarker from '$lib/assets/greenMarker.svg';
 	import selectedMarker from '$lib/assets/yellowMarker.svg';
 	import { Sync } from '$lib/sync.js';
+	import { onMount } from 'svelte';
 
 	let nkState = getState();
 	let { data } = $props();
@@ -80,7 +81,6 @@
 		iconUrl: selectedMarker
 	};
 
-	let timeoutId: number = -1;
 	$effect(() => {
 		if (map) {
 			console.log('mapeffect');
@@ -101,6 +101,19 @@
 				sessionStorage.removeItem('zoom');
 			}
 		}
+	});
+
+	// hack, desperate to call fetchData when refreshing / page
+	let tid: NodeJS.Timeout | null = null;
+	onMount(() => {
+		if (tid) {
+			clearTimeout(tid);
+		}
+		tid = setTimeout(() => {
+			if (nkValues.length == 0) {
+				nkState.fetchData();
+			}
+		}, 100);
 	});
 
 	function toggleDL() {
@@ -246,7 +259,6 @@
 	}
 
 	let locid = -1;
-	let tid: NodeJS.Timeout | null = null;
 	let geoloc = $state(false);
 
 	function posSucc(pos: any) {

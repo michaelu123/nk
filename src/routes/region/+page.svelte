@@ -147,6 +147,12 @@
 		});
 		navigator.serviceWorker.controller?.postMessage({ region: $state.snapshot(nkState.region) });
 	}
+
+	async function gotoRoot() {
+		await selectRegion();
+		nkState.fetchData();
+		goto('/');
+	}
 </script>
 
 {#snippet editing()}
@@ -221,7 +227,7 @@
 	</div>
 	<div class="mb-4 flex flex-row flex-wrap">
 		{#if region && region.name != 'default'}
-			<Button class="m-4 w-min whitespace-nowrap" onclick={() => goto('/')}>Zur Karte</Button>
+			<Button class="m-4 w-min whitespace-nowrap" onclick={gotoRoot}>Zur Karte</Button>
 			<Button class="m-4 w-min" onclick={() => toggleEditMode(false)}
 				>{isEditMode ? 'Speichern' : 'Ändern'}</Button
 			>

@@ -170,6 +170,9 @@ export class State implements StateProps {
 		this.region = data.region;
 		this.regions = data.regions || [];
 		this.selectedRegion = data.selectedRegion;
+		if (this.region) {
+			this.defaultCenter = this.region.center;
+		}
 	}
 
 	updateRegion(
@@ -180,6 +183,9 @@ export class State implements StateProps {
 		this.region = regionIdb ?? null;
 		this.regions = regionsIdb || [];
 		this.selectedRegion = selectedRegion ?? null;
+		if (this.region) {
+			this.defaultCenter = this.region.center;
+		}
 	}
 
 	getLocalStorageKeys(nk: boolean): string[] {
@@ -211,7 +217,7 @@ export class State implements StateProps {
 		if (!occs || occs.length == 0) {
 			// seed occs
 			const occs = which == 'nktypes' ? nkDefaultTypes : nkDefaultSpecies;
-			this.storeSettings(which, occs);
+			await this.storeSettings(which, occs);
 		}
 		if (which == 'nktypes') {
 			for (const occ of occs) {
