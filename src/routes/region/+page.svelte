@@ -12,6 +12,10 @@
 	let { regions, region } = $derived(nkState);
 	$inspect('region', region);
 
+	let { data } = $props();
+	let { regionIdb, selectedRegion, regionsIdb } = data;
+	nkState.updateRegion(regionIdb, selectedRegion, regionsIdb);
+
 	let map: any = $state(null);
 	let center = $state(nkState.region?.center || State.regionDefault.center);
 	let zoom = $state(16);
@@ -215,36 +219,8 @@
 			{/each}
 		</Select>
 	</div>
-	<!-- {#if region}
-		<Label for="regionname" class="mb-4">
-			Name des Reviers
-			<Input
-				id="regionname"
-				name="regionname"
-				type="text"
-				placeholder="Name"
-				bind:value={region.name}
-				size="lg"
-				class="pl-10"
-				readonly={true}
-			/>
-		</Label>
-		<Label for="shortname" class="mb-4">
-			Kurzform des Namens
-			<Input
-				id="shortname"
-				name="shortname"
-				type="text"
-				placeholder="Kurzname"
-				bind:value={region.shortName}
-				size="lg"
-				class="pl-10"
-				readonly={true}
-			/>
-		</Label>
-	{/if} -->
 	<div class="mb-4 flex flex-row flex-wrap">
-		{#if region}
+		{#if region && region.name != 'default'}
 			<Button class="m-4 w-min whitespace-nowrap" onclick={() => goto('/')}>Zur Karte</Button>
 			<Button class="m-4 w-min" onclick={() => toggleEditMode(false)}
 				>{isEditMode ? 'Speichern' : 'Ändern'}</Button
@@ -256,7 +232,7 @@
 	</div>
 	{#if progress != 0}
 		<div class="absolute left-1/4 top-1/3 z-[490] w-2/4">
-			<Progressbar {progress} labelOutside="Kartenladen-Fortschritt" size="h-6" />
+			<Progressbar {progress} labelOutside="Fortschritt" size="h-6" />
 		</div>
 	{/if}
 {/snippet}
@@ -280,7 +256,7 @@
 				maxBounds
 			}}
 		>
-			<p id="crosshair">{'\u2316'}</p>
+			<!--p id="crosshair">{'\u2316'}</p-->
 			<Polygon
 				latLngs={[
 					[maxBounds[0][0], maxBounds[0][1]],

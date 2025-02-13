@@ -346,7 +346,7 @@
 	async function clearData() {
 		await rmR();
 		const sy = new Sync(nkState, fetch!, () => {});
-		await sy.clearDb();
+		await sy.clearIDb(false);
 		isSidebarOpen = false;
 	}
 </script>
@@ -467,7 +467,7 @@
 			<SidebarItem label={isGPSon ? 'GPS aus' : 'GPS ein'} onclick={posStart}></SidebarItem>
 			<SidebarItem label={followingGPS ? 'GPS nicht folgen' : 'GPS folgen'} onclick={followGPS}
 			></SidebarItem>
-			<SidebarItem label="Daten sync" onclick={syncServer}></SidebarItem>
+			<SidebarItem label="Server sync" onclick={syncServer}></SidebarItem>
 			{#if $page.url.hostname == 'localhost' || $page.url.searchParams.get('more')}
 				<SidebarItem label="Nabu-Import" href="/nabuimport"></SidebarItem>
 				<SidebarItem label="ls-R" onclick={lsR}></SidebarItem>

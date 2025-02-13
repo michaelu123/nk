@@ -5,7 +5,8 @@ import { eq, and, inArray, isNull } from 'drizzle-orm';
 import type { LayoutServerLoad } from './$types';
 export const ssr = false;
 export const load: LayoutServerLoad = async (event) => {
-	if (event.url.pathname == '/login') {
+	const pathname = event.url.pathname;
+	if (pathname.startsWith('/log') || pathname == '/register') {
 		return { user: null, regionsDB: null };
 	}
 	const user = event.locals.user;

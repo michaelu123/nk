@@ -3,7 +3,8 @@ import { browser } from '$app/environment';
 import { openDB, type IDBPDatabase, wrap } from 'idb';
 import { getDirectory, getfs } from '$lib/fs';
 import { redirect } from '@sveltejs/kit';
-import { type Region } from '$lib/state.svelte';
+import { State, type Region } from '$lib/state.svelte';
+import { clearIDb } from '$lib/utils';
 
 let useBucketsAnyways = true; // TODO configurable
 let useIndexedDbAnyways = true; // TODO configurable
@@ -105,27 +106,55 @@ async function getRootDir(): Promise<FileSystemDirectoryEntry | null> {
 }
 
 export const load: LayoutLoad = async ({ data, url, fetch }) => {
-	console.log('+layout.ts', browser, url);
 	const { user, regionsDB } = data;
 	if (browser) {
-		let regionIdb: Region | null = null;
-		let regionsIdb: Region[] | null = null;
-		let selectedRegion: string | null = null;
 		let { idb, bucket } = await getStorage();
+
+		const storedUser = idb
+			? await idb.get('settings', 'username')
+			: localStorage.getItem('_username');
+		if (user && user.username != storedUser) {
+			await clearIDb(idb, true);
+			if (idb) {
+				await idb.put('settings', user.username, 'username');
+			} else {
+				localStorage.setItem('_username', user.username);
+			}
+		}
+
+		let regionsIdb: Region[] | null = idb
+			? await idb.get('settings', 'regions')
+			: (JSON.parse(localStorage.getItem('_regions') || '[]') as Region[]);
+
+		if ((!regionsIdb || regionsIdb.length == 0) && regionsDB && regionsDB.length > 0) {
+			regionsIdb = [];
+			for (const rdb of regionsDB) {
+				const obj: any = JSON.parse(rdb.data!);
+				const ridb: Region = {
+					name: rdb.regionname!,
+					shortName: rdb.shortname!,
+					lowerLeft: obj.lowerLeft,
+					upperRight: obj.upperRight,
+					center: obj.center
+				};
+				regionsIdb.push(ridb);
+			}
+			State.storeSettings(idb, 'regions', regionsIdb); // async !?
+		} else {
+		}
+
+		let regionIdb: Region | null = null;
+		let selectedRegion: string | null = null;
 		let rootDir = await getRootDir();
 
 		selectedRegion = idb
 			? await idb.get('settings', 'selectedRegion')
 			: localStorage.getItem('_selectedRegion');
 
-		regionsIdb = idb
-			? await idb.get('settings', 'regions')
-			: (JSON.parse(localStorage.getItem('_regions') || '[]') as Region[]);
 		regionIdb = (regionsIdb || []).find((r) => r.shortName == selectedRegion) ?? null;
 
 		if (!regionsIdb || regionsIdb.length == 0 || !selectedRegion) {
-			if (url.pathname != '/region') {
-				console.log('redirect1 /region');
+			if (url.pathname != '/region' && !url.pathname.startsWith('/log')) {
 				return redirect(307, '/region');
 			}
 		}

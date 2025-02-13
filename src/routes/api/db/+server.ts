@@ -457,6 +457,32 @@ async function sepAlle() {
 	return json({ xx: 'yy' });
 }
 
+async function fixRegions() {
+	const regs = await db.select().from(nktables.regions);
+	for (const r of regs) {
+		let val = JSON.parse(r.data!);
+		if (val.lowerLeft[0] > val.upperRight[0]) {
+			const x = val.lowerLeft[0];
+			val.lowerLeft[0] = val.upperRight[0];
+			val.upperRight[0] = x;
+		}
+		if (val.lowerLeft[1] > val.upperRight[1]) {
+			const x = val.lowerLeft[1];
+			val.lowerLeft[1] = val.upperRight[1];
+			val.upperRight[1] = x;
+		}
+
+		val.center[0] = (val.lowerLeft[0] + val.upperRight[0]) / 2;
+		val.center[1] = (val.lowerLeft[1] + val.upperRight[1]) / 2;
+		r.data = JSON.stringify(val);
+		await db
+			.update(nktables.regions)
+			.set({ data: r.data })
+			.where(eq(nktables.regions.shortname, r.shortname!));
+	}
+	return json({ regs });
+}
+
 // the get handler gets all change dates, or all nks, or all ctrls, or one image
 export const GET: RequestHandler = async ({ url }) => {
 	const what = url.searchParams.get('what');
@@ -467,6 +493,7 @@ export const GET: RequestHandler = async ({ url }) => {
 	if (what == 'img') return await getImage(url.searchParams.get('imgPath'));
 	if (what == 'dpl') return await removeDuplicates();
 	if (what == 'sep') return await sepAlle();
+	if (what == 'reg') return await fixRegions();
 	return json([]);
 };
 

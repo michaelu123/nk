@@ -1,6 +1,6 @@
 import type { IDBPDatabase } from 'idb';
 import { type ControlEntry, type NkEntry, type Region, type State } from './state.svelte';
-import { lastChanged, nk2DBStr, sleep } from './utils';
+import { clearIDb, lastChanged, nk2DBStr, sleep } from './utils';
 import { createDirsFor, createFile, createWriter, existsFS, fetchBlob, writeFile } from './fs';
 import type { RegionsDbSelect } from './server/db/schema';
 
@@ -177,7 +177,7 @@ export class Sync {
 			counters.set(region.name, { nk: this.nkCount, ctrls: this.ctrlsCount, to: toCnt });
 		}
 		// clear local data
-		await this.clearDb(); // only nk and kontrollen
+		await this.clearIDb(false); // only nk and kontrollen
 		// load server data anew into client
 		for (const region of this.nkState.regions) {
 			this.shortName = region.shortName;
@@ -365,13 +365,8 @@ export class Sync {
 		return cmp;
 	}
 
-	async clearDb() {
-		if (this.idb) {
-			await this.idb.clear('kontrollen');
-			await this.idb.clear('nk');
-		} else {
-			localStorage.clear();
-		}
+	async clearIDb(withSettings: boolean) {
+		clearIDb(this.idb, withSettings);
 	}
 
 	async removeDuplicates() {

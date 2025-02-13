@@ -170,7 +170,16 @@ export class State implements StateProps {
 		this.region = data.region;
 		this.regions = data.regions || [];
 		this.selectedRegion = data.selectedRegion;
-		this.fetchData();
+	}
+
+	updateRegion(
+		regionIdb: Region | null | undefined,
+		selectedRegion: string | null | undefined,
+		regionsIdb: Region[] | null | undefined
+	) {
+		this.region = regionIdb ?? null;
+		this.regions = regionsIdb || [];
+		this.selectedRegion = selectedRegion ?? null;
 	}
 
 	getLocalStorageKeys(nk: boolean): string[] {
@@ -491,7 +500,6 @@ export class State implements StateProps {
 		this.selectedRegion = rg.shortName;
 		this.region = rg;
 		await this.storeSettings('selectedRegion', rg.shortName);
-		await this.fetchData();
 		return center;
 	}
 

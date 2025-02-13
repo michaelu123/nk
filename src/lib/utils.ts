@@ -1,3 +1,4 @@
+import type { IDBPDatabase } from 'idb';
 import type { ControlEntry, NkEntry, Region } from './state.svelte';
 
 export function date2Str(val: any) {
@@ -70,4 +71,16 @@ export function lastChanged(o: any): string {
 
 export function sleep(ms: number) {
 	return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+export async function clearIDb(idb: IDBPDatabase | null, withSettings: boolean) {
+	if (idb) {
+		await idb.clear('kontrollen');
+		await idb.clear('nk');
+		if (withSettings) {
+			await idb.clear('settings');
+		}
+	} else {
+		localStorage.clear();
+	}
 }
