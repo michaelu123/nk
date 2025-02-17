@@ -5,7 +5,7 @@
 	import { getState, type ControlEntry, type NkEntry } from '$lib/state.svelte';
 	import { goto } from '$app/navigation';
 	import { Button } from 'svelte-5-ui-lib';
-	import { parse, HTMLElement } from 'node-html-parser';
+	import { parse, type HTMLElement } from 'node-html-parser';
 
 	let nkState = getState();
 	let isLoading = $state(false);
