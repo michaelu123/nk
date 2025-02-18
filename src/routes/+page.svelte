@@ -367,7 +367,7 @@
 	<div
 		class="absolute top-0 z-[500] flex h-16 w-11/12 items-center justify-start gap-4 bg-slate-100 p-2"
 	>
-		<SidebarButton onclick={sidebarUi.toggle} class="mb-2" breakpoint="md" />
+		<SidebarButton onclick={sidebarUi.toggle} class="mb-2" breakpoint="2xl" />
 		<div class="w-full"><p class="text-center">{region?.name}</p></div>
 		{#if $page.url.hostname == 'localhost'}
 			<Button outline pill onclick={logmap}>?</Button>
@@ -461,11 +461,11 @@
 		isOpen={isSidebarOpen}
 		{closeSidebar}
 		params={{ x: -50, duration: 500 }}
-		class="z-[500]  h-full w-auto"
+		class="top-1/4  z-[500] h-max w-auto"
 		position="absolute"
 		activeClass="p-2"
-		nonActiveClass="p-2"
-		breakpoint="md"
+		nonActiveClass="p-4"
+		breakpoint="2xl"
 	>
 		<!-- <CloseButton
 			onclick={closeSidebar}
@@ -473,13 +473,13 @@
 			class="absolute right-2 top-2 p-2 md:hidden"
 		/> -->
 		<SidebarGroup border={false}>
-			<SidebarItem label="Revier" href="/region"></SidebarItem>
+			<SidebarItem id="revier" label="Revierauswahl" href="/region"></SidebarItem>
 			<SidebarItem label="Neues Zentrum" onclick={updDefaultCenter}></SidebarItem>
 			<SidebarItem label="Zum Zentrum" onclick={() => centerMap(defaultCenter)}></SidebarItem>
 			<SidebarItem label={isGPSon ? 'GPS aus' : 'GPS ein'} onclick={posStart}></SidebarItem>
 			<SidebarItem label={followingGPS ? 'GPS nicht folgen' : 'GPS folgen'} onclick={followGPS}
 			></SidebarItem>
-			<SidebarItem label="Server sync" onclick={syncServer}></SidebarItem>
+			<SidebarItem label="Datenaustausch" onclick={syncServer}></SidebarItem>
 			{#if $page.url.hostname == 'localhost' || $page.url.searchParams.get('more')}
 				<SidebarItem label="Nabu-Import" href="/nabuimport"></SidebarItem>
 				<SidebarItem label="ls-R" onclick={lsR}></SidebarItem>

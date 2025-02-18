@@ -266,6 +266,15 @@ async function postRegions(request: Request, userObj: any) {
 	return json(regionsDB);
 }
 
+async function postUserRegion(request: Request) {
+	const usrreg = (await request.json()) as { userid: string; region: number };
+	await db.insert(nktables.userregions).values({
+		userid: usrreg.userid,
+		region: usrreg.region
+	});
+	return json({ ok: true }); // no news is good news
+}
+
 async function getChgs(region: string | null): Promise<Response> {
 	let scMap = new Map<number, ServerChanges>();
 	let mchanges = await db
@@ -483,6 +492,35 @@ async function fixRegions() {
 	return json({ regs });
 }
 
+async function getUsers(region: string | null) {
+	if (!region) {
+		return json({ error: 'no region shortname provided' });
+	}
+	const allUsers = await db
+		.select({ id: nktables.user.id, username: nktables.user.username })
+		.from(nktables.user);
+
+	const regionId = await db
+		.select({ id: nktables.regions.id })
+		.from(nktables.regions)
+		.where(eq(nktables.regions.shortname, region));
+
+	const userIdsQuery = db
+		.select({ userid: nktables.userregions.userid })
+		.from(nktables.userregions)
+		.where(eq(nktables.userregions.region, regionId[0].id));
+
+	const regionUsers = await db
+		.select({
+			id: nktables.user.id,
+			username: nktables.user.username
+		})
+		.from(nktables.user)
+		.where(inArray(nktables.user.id, userIdsQuery));
+
+	return json({ allUsers, regionUsers, regionId });
+}
+
 // the get handler gets all change dates, or all nks, or all ctrls, or one image
 export const GET: RequestHandler = async ({ url }) => {
 	const what = url.searchParams.get('what');
@@ -494,6 +532,7 @@ export const GET: RequestHandler = async ({ url }) => {
 	if (what == 'dpl') return await removeDuplicates();
 	if (what == 'sep') return await sepAlle();
 	if (what == 'reg') return await fixRegions();
+	if (what == 'usr') return await getUsers(region);
 	return json([]);
 };
 
@@ -503,5 +542,6 @@ export const POST: RequestHandler = async ({ url, request, locals }) => {
 		return await postNk(request, locals.user!.username, url.searchParams.get('region'));
 	if (what == 'img') return await postImage(request, url.searchParams.get('imgPath'));
 	if (what == 'regions') return await postRegions(request, locals.user!);
+	if (what == 'usrreg') return await postUserRegion(request);
 	return json([]);
 };

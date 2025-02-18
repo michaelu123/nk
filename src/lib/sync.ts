@@ -203,7 +203,7 @@ export class Sync {
 	async postImage(imgPath: string) {
 		try {
 			const blob = await fetchBlob(this.nkState.rootDir!, imgPath);
-			const response = await fetch('/api/db?what=img&imgPath=' + imgPath, {
+			const response = await this.fetch('/api/db?what=img&imgPath=' + imgPath, {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/octet-stream'
@@ -244,7 +244,7 @@ export class Sync {
 
 	async storeOnServer(nk: NkEntry) {
 		const js = nk2DBStr(nk, true);
-		const response = await fetch!('/api/db?what=nk&region=' + this.shortName, {
+		const response = await this.fetch!('/api/db?what=nk&region=' + this.shortName, {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/json'
@@ -386,7 +386,7 @@ export class Sync {
 			: localStorage.getItem('_regions');
 		const regionsJS = this.idb ? JSON.stringify(rval) : rval;
 		try {
-			const response = await fetch('/api/db?what=regions', {
+			const response = await this.fetch('/api/db?what=regions', {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json'

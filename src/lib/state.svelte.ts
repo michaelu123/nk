@@ -4,6 +4,7 @@ import type { IDBPDatabase } from 'idb';
 import { removePath } from './fs';
 import { ctrl2Str, date2Str } from './utils';
 import { goto } from '$app/navigation';
+import { SvelteMap } from 'svelte/reactivity';
 
 const MAX_DAYS = 100; // TODO configurable?
 const MAX_TIME_MS = MAX_DAYS * 24 * 60 * 60 * 1000;
@@ -154,8 +155,8 @@ export class State implements StateProps {
 		this.region ? this.region.lowerLeft : State.regionDefault.lowerLeft,
 		this.region ? this.region.upperRight : State.regionDefault.upperRight
 	]);
-	nkTypes: Map<string, number> = $state(new Map());
-	nkSpecies: Map<string, number> = $state(new Map());
+	nkTypes: Map<string, number> = new SvelteMap();
+	nkSpecies: Map<string, number> = new SvelteMap();
 	isLoading = $state(false);
 
 	constructor(data: StateProps) {

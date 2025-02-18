@@ -1,9 +1,11 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { getState, State, type Region } from '$lib/state.svelte';
+	import ProposedInput from '$lib/components/ProposedInput.svelte';
+	import { getState, State, type Region, type User } from '$lib/state.svelte';
 	import { Map as SVMap, TileLayer, ControlZoom, ControlAttribution, Polygon } from 'sveaflet';
 	import { onMount } from 'svelte';
-	import { Button, Input, Label, Progressbar, Range, Select } from 'svelte-5-ui-lib';
+	import { Button, Card, Input, Label, Modal, Progressbar, Range, Select } from 'svelte-5-ui-lib';
+	import { SvelteMap } from 'svelte/reactivity';
 
 	const xFactor = 3000.0;
 	const yFactor = 4000.0;
@@ -13,7 +15,7 @@
 	$inspect('region', region);
 
 	let { data } = $props();
-	let { regionIdb, selectedRegion, regionsIdb } = data;
+	let { regionIdb, selectedRegion, regionsIdb, fetch, user } = data;
 	nkState.updateRegion(regionIdb, selectedRegion, regionsIdb);
 
 	let map: any = $state(null);
@@ -43,6 +45,13 @@
 	let errorMessage1 = $state('');
 	let errorMessage2 = $state('');
 	let progress = $state(0);
+
+	let addingUser = $state(false);
+	let addedUser = $state('');
+	let userMap: Map<string, number> = new SvelteMap();
+	let idMap: Map<string, string> = new Map();
+	let regionUserNames: string[] = $state([]);
+	let regionIdId: number;
 
 	function onMapMove(e: any) {
 		const mc = map.getCenter();
@@ -153,6 +162,44 @@
 		nkState.fetchData();
 		goto('/');
 	}
+
+	async function addUser() {
+		addingUser = true;
+		addedUser = '';
+		regionUserNames = [];
+		const response = await fetch!('/api/db?what=usr&region=' + shortName);
+		const { allUsers, regionUsers, regionId } = await response.json();
+		for (const userEntry of allUsers) {
+			if (userEntry.id !== user!.id) {
+				// don't add yourself
+				userMap.set(userEntry.username, 1);
+				idMap.set(userEntry.username, userEntry.id);
+			}
+		}
+		for (const userEntry of regionUsers) {
+			regionUserNames.push(userEntry.username);
+		}
+		regionIdId = regionId[0].id;
+	}
+
+	$effect(() => {
+		if (userMap.get(addedUser)) {
+			fetch!('/api/db?what=usrreg', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({ userid: idMap.get(addedUser), region: regionIdId })
+			}).then((resp: Response) => {
+				if (resp.ok) {
+					alert(`${addedUser} wurde als Betreuer für das Revier ${regionName} eingetragen`);
+				} else {
+					alert('error: ' + resp);
+				}
+			});
+			addingUser = false;
+		}
+	});
 </script>
 
 {#snippet editing()}
@@ -225,21 +272,49 @@
 			{/each}
 		</Select>
 	</div>
-	<div class="mb-4 flex flex-row flex-wrap">
+	<div class="mb-4 flex flex-row flex-wrap justify-between">
 		{#if region && region.name != 'default'}
 			<Button class="m-4 w-min whitespace-nowrap" onclick={gotoRoot}>Zur Karte</Button>
 			<Button class="m-4 w-min" onclick={() => toggleEditMode(false)}
 				>{isEditMode ? 'Speichern' : 'Ändern'}</Button
 			>
 			<Button class="m-4 w-min" onclick={deleteRegion}>Löschen</Button>
-			<Button class="m-4 w-min whitespace-nowrap" onclick={prefetchRegion}>Map laden</Button>
+			<Button class="m-4 w-min whitespace-nowrap" onclick={prefetchRegion}
+				>Karten-Kacheln laden</Button
+			>
+			<Button class="m-4 w-min whitespace-nowrap" onclick={addUser}>Betreuer</Button>
 		{/if}
-		<Button class="m-4 w-min" onclick={() => toggleEditMode(true)}>Neu</Button>
+		<Button class="m-4 w-min whitespace-nowrap" onclick={() => toggleEditMode(true)}
+			>Neues Revier</Button
+		>
 	</div>
 	{#if progress != 0}
 		<div class="absolute left-1/4 top-1/3 z-[490] w-2/4">
 			<Progressbar {progress} labelOutside="Fortschritt" size="h-6" />
 		</div>
+	{/if}
+	{#if addingUser}
+		<Modal
+			class="z-[1900]"
+			size="lg"
+			title="Zusätzlichen Betreuer für {regionName} hinzufügen"
+			modalStatus={addingUser}
+			closeModal={() => (addingUser = false)}
+		>
+			<Card>
+				<h3 class="py-4 font-semibold">Bisherige Betreuer:</h3>
+				<ul>
+					{#each regionUserNames as run}
+						<li>- {run}</li>
+					{/each}
+				</ul>
+			</Card>
+
+			<Card>
+				<h3 class="py-4 font-semibold">Betreuer hinzufügen:</h3>
+				<ProposedInput itemMap={userMap} bind:value={addedUser} label="Betreuer"></ProposedInput>
+			</Card>
+		</Modal>
 	{/if}
 {/snippet}
 
