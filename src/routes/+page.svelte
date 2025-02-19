@@ -56,8 +56,8 @@
 	nkState.region = region || State.regionDefault;
 	let currPos = $state(nkState.region.center);
 	let radius = $state(100);
-	let followingGPS = $state(false);
-	let isGPSon = $state(false);
+	let followingGPS = $state(!!sessionStorage.getItem('followgps'));
+	let isGPSon = $state(!!sessionStorage.getItem('gpson'));
 	let progress = $state(0);
 
 	const commonIconOptions = {
@@ -293,6 +293,7 @@
 				locid = -1;
 			}
 			isGPSon = false;
+			sessionStorage.setItem('gpson', '');
 		} else {
 			if ('geolocation' in navigator) {
 				geoloc = true;
@@ -303,12 +304,14 @@
 				console.log('geolocation is not available');
 			}
 			isGPSon = true;
+			sessionStorage.setItem('gpson', 'true');
 		}
 		isSidebarOpen = false;
 	}
 
 	function followGPS() {
 		followingGPS = !followingGPS;
+		sessionStorage.setItem('followgps', followingGPS ? 'true' : '');
 		if (followingGPS) {
 			map.flyTo(currPos, map.getZoom());
 		}

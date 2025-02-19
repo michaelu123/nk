@@ -55,6 +55,10 @@ export class Sync {
 		const scMap = new Map<string, ServerChanges>(); // lastChanged date of db entries
 		const csMap = new Map<string, CmpResult>(); // client: newer or new on client
 
+		const nkVals = await this.nkState.fetchNks(true); // including deleted items
+		await this.nkState.fetchCtrls(nkVals, true);
+		if (nkVals.length == 0) return 0;
+
 		const chgResponse = await this.fetch('/api/db?what=chg&region=' + this.shortName, {
 			method: 'GET',
 			headers: {
@@ -73,10 +77,7 @@ export class Sync {
 			csMap.set(idS, { cmp: cmp_server, imgFromServer, imgToServer: [] });
 		}
 
-		const meVals = await this.nkState.fetchNks(true); // including deleted items
-		await this.nkState.fetchCtrls(meVals, true);
-
-		for (let nk of meVals) {
+		for (let nk of nkVals) {
 			const cmpRes = await this.compareChanges(nk, scMap.get(nk.id) ?? null);
 			csMap.set(nk.id, cmpRes); // may overwrite entries set to server above
 		}
@@ -89,7 +90,7 @@ export class Sync {
 		let cnt = 0;
 		let toCnt = 0;
 		for (const [nkid, cmpRes] of csMap.entries()) {
-			const nk = meVals.find((m) => m.id == nkid)!;
+			const nk = nkVals.find((m) => m.id == nkid)!;
 			console.assert(nk, 'cannot find NK data for nkid ' + nkid);
 			if (cmpRes.cmp & cmp_client) {
 				toCnt++;
@@ -126,7 +127,6 @@ export class Sync {
 		const ctrls = (await ctrlResponse.json()) as ControlEntry[];
 
 		const len = meVals.length + ctrls.length;
-		let fromCnt = len;
 		let cnt = 0;
 		for (const nk of meVals) {
 			if (this.idb) {

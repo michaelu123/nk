@@ -12,7 +12,6 @@
 
 	let nkState = getState();
 	let { regions, region } = $derived(nkState);
-	$inspect('region', region);
 
 	let { data } = $props();
 	let { regionIdb, selectedRegion, regionsIdb, fetch, user } = data;
